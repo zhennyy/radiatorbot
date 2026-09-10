@@ -1,13 +1,38 @@
 // webhook.js
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const basicAuth = require('express-basic-auth');
 const db = require('./db');
 const { checkLowStock } = require('./notify');
 
+// фото товаров храним рядом с базой — на Railway это подключённый Volume,
+// так что файлы переживают редеплой (в отличие от остальной файловой системы)
+const dbDir = path.dirname(path.resolve(process.env.DB_PATH || 'shop.db'));
+const uploadsDir = path.join(dbDir, 'uploads');
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8 МБ
+  fileFilter: (req, file, cb) => {
+    if (!/^image\//.test(file.mimetype)) return cb(new Error('Файл должен быть изображением.'));
+    cb(null, true);
+  },
+});
+
 function startWebhookServer(bot) {
   const app = express();
+  app.set('trust proxy', true); // за прокси Railway — иначе req.protocol всегда 'http'
   app.use(express.json());
+  app.use('/uploads', express.static(uploadsDir)); // без авторизации — Telegram должен уметь их скачать
 
   // === Вебхук ЮKassa (без авторизации — вызывается самой ЮKassa) ===
   app.post('/yookassa-webhook', async (req, res) => {
@@ -86,6 +111,15 @@ function startWebhookServer(bot) {
   app.delete('/api/products/:id', (req, res) => {
     db.prepare('DELETE FROM products WHERE id = ?').run(req.params.id);
     res.json({ ok: true });
+  });
+
+  app.post('/api/upload', (req, res) => {
+    upload.single('photo')(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: 'Файл не получен.' });
+      const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      res.json({ url });
+    });
   });
 
   app.get('/api/orders', (req, res) => {

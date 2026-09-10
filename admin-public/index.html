@@ -84,9 +84,12 @@
         <input id="p-price" placeholder="Цена, ₽" type="number">
         <input id="p-stock" placeholder="Остаток" type="number">
         <input id="p-category" placeholder="Категория">
-        <input id="p-photo" placeholder="Ссылка на фото (URL)" style="flex: 1; min-width: 200px;">
+        <input id="p-photo" placeholder="Ссылка на фото (URL) или загрузите файл" style="flex: 1; min-width: 200px;">
+        <input type="file" id="p-photo-file" accept="image/*" style="display:none" onchange="uploadNewProductPhoto(this.files[0])">
+        <button type="button" onclick="document.getElementById('p-photo-file').click()">📷 Загрузить с компьютера</button>
         <button class="primary" onclick="addProduct()">Добавить</button>
       </div>
+      <p class="empty" id="p-photo-status"></p>
     </div>
     <div class="card">
       <h2>Каталог</h2>
@@ -165,10 +168,51 @@ async function loadProducts() {
       <td>${money(p.price)}</td>
       <td><input type="number" value="${p.stock}" onchange="updateStock(${p.id}, this.value)"></td>
       <td class="row-actions">
-        <button onclick="editPhoto(${p.id}, '${(p.photo_url || '').replace(/'/g, "\\'")}')">Фото</button>
+        <button onclick="editPhoto(${p.id}, '${(p.photo_url || '').replace(/'/g, "\\'")}')">Ссылка</button>
+        <input type="file" accept="image/*" style="display:none" id="file-${p.id}" onchange="uploadProductPhoto(${p.id}, this.files[0])">
+        <button onclick="document.getElementById('file-${p.id}').click()">📷 Загрузить</button>
         <button class="danger" onclick="deleteProduct(${p.id})">Удалить</button>
       </td>
     </tr>`).join('');
+}
+
+async function uploadPhotoFile(file) {
+  const body = new FormData();
+  body.append('photo', file);
+  const res = await fetch('/api/upload', { method: 'POST', body });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Не удалось загрузить файл.');
+  return data.url;
+}
+
+async function uploadNewProductPhoto(file) {
+  if (!file) return;
+  const status = document.getElementById('p-photo-status');
+  status.textContent = 'Загружаю...';
+  try {
+    const url = await uploadPhotoFile(file);
+    document.getElementById('p-photo').value = url;
+    status.textContent = 'Фото загружено ✓';
+  } catch (err) {
+    status.textContent = err.message;
+  }
+}
+
+async function uploadProductPhoto(id, file) {
+  if (!file) return;
+  try {
+    const url = await uploadPhotoFile(file);
+    const products = await fetch('/api/products').then(r => r.json());
+    const p = products.find(p => p.id === id);
+    if (!p) return;
+    await fetch(`/api/products/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...p, price: p.price / 100, photo_url: url }),
+    });
+    loadProducts();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 async function addProduct() {
@@ -188,6 +232,7 @@ async function addProduct() {
   document.getElementById('p-stock').value = '';
   document.getElementById('p-category').value = '';
   document.getElementById('p-photo').value = '';
+  document.getElementById('p-photo-status').textContent = '';
   loadProducts();
 }
 

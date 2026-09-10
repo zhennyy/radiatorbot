@@ -13,3 +13,4 @@ shop.db
 
 npm-debug.log*
 *.log
+uploads/
