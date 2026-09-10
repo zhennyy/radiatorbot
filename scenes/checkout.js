@@ -253,11 +253,12 @@ function createPendingOrder(
   deliveryCost = 0
 ) {
   const { items } = getCart(chatId);
+  const orderCode = db.generateOrderCode();
   const order = db
     .prepare(
-      'INSERT INTO orders (chat_id, status, total, address, payment_provider, promo_code, discount_percent, delivery_city, delivery_cost) VALUES (?,?,?,?,?,?,?,?,?)'
+      'INSERT INTO orders (chat_id, status, total, address, payment_provider, promo_code, discount_percent, delivery_city, delivery_cost, order_code) VALUES (?,?,?,?,?,?,?,?,?,?)'
     )
-    .run(chatId, 'pending', total, address, provider, promoCode, discountPercent, deliveryCity, deliveryCost);
+    .run(chatId, 'pending', total, address, provider, promoCode, discountPercent, deliveryCity, deliveryCost, orderCode);
   const orderId = order.lastInsertRowid;
   const insertItem = db.prepare(
     'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?,?,?,?)'

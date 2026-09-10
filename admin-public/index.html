@@ -195,7 +195,7 @@
           <option value="delivered" data-i18n="optDelivered">Доставлен</option>
           <option value="cancelled" data-i18n="optCancelled">Отменён</option>
         </select>
-        <input id="o-search" data-i18n-ph="phSearch" placeholder="Поиск: № заказа, адрес, chat ID" style="flex: 1; min-width: 200px;" oninput="debounceLoadOrders()">
+        <input id="o-search" data-i18n-ph="phSearch" placeholder="Поиск: № заказа, код, адрес, chat ID" style="flex: 1; min-width: 200px;" oninput="debounceLoadOrders()">
         <button type="button" data-i18n="btnDownloadCsv" onclick="exportOrdersCsv()">⬇️ Скачать CSV</button>
       </div>
       <div class="table-wrap"><table id="orders-table"></table></div>
@@ -279,7 +279,7 @@ const ADMIN_STRINGS = {
     phPhoto: 'Ссылка на фото (URL) или загрузите файл',
     phNameEn: 'Название на англ. (необязательно)', phCategoryEn: 'Категория на англ. (необязательно)',
     phCityEn: 'Город на англ. (необязательно)',
-    phSearch: 'Поиск: № заказа, адрес, chat ID',
+    phSearch: 'Поиск: № заказа, код, адрес, chat ID',
     phPromoCode: 'Код (например SALE10)', phPromoPercent: 'Скидка, %', phPromoMax: 'Лимит использований (опц.)',
     phCity: 'Город',
 
@@ -349,7 +349,7 @@ const ADMIN_STRINGS = {
     phPhoto: 'Photo URL or upload a file',
     phNameEn: 'English name (optional)', phCategoryEn: 'English category (optional)',
     phCityEn: 'English city name (optional)',
-    phSearch: 'Search: order #, address, chat ID',
+    phSearch: 'Search: order #, code, address, chat ID',
     phPromoCode: 'Code (e.g. SALE10)', phPromoPercent: 'Discount, %', phPromoMax: 'Usage limit (optional)',
     phCity: 'City',
 
@@ -629,7 +629,7 @@ async function loadOrders() {
       const st = (o.status || '').split(':')[0];
       const label = a('STATUS_LABEL')[st] || st;
       return `<tr class="order-row" onclick="openOrderDetail(${o.id})">
-        <td>#${o.id}</td>
+        <td>#${o.id}${o.order_code ? `<div class="empty" style="margin:0;">${o.order_code}</div>` : ''}</td>
         <td><span class="status-pill status-${st}">${label}</span></td>
         <td>${money(o.total)}</td>
         <td>${o.items.map(i => `${(ADMIN_LANG === 'en' && i.name_en) || i.name} ×${i.quantity}`).join(', ')}</td>
@@ -675,7 +675,7 @@ async function openOrderDetail(id) {
   const itemsHtml = o.items.map(i => `<div><span>${(ADMIN_LANG === 'en' && i.name_en) || i.name} ×${i.quantity}</span><span>${money(i.price * i.quantity)}</span></div>`).join('');
   body.innerHTML = `
     <button class="om-close" onclick="closeOrderDetail()">✕</button>
-    <h3>${a('orderNumber', o.id)}</h3>
+    <h3>${a('orderNumber', o.id)}${o.order_code ? ` · ${o.order_code}` : ''}</h3>
     <div class="om-sub">${o.created_at || ''}</div>
     <div class="om-row"><span class="om-label">${a('thStatus')}</span><span class="status-pill status-${st}">${label}</span></div>
     <div class="om-items">${itemsHtml || `<div>${a('noItems')}</div>`}</div>

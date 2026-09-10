@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS orders (
   total INTEGER NOT NULL,
   address TEXT,
   payment_provider TEXT,
+  order_code TEXT, -- короткий код заказа (4 символа) для покупателя, вместо порядкового id
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -134,6 +135,29 @@ if (!orderColumns.includes('delivery_city')) {
 }
 if (!orderColumns.includes('delivery_cost')) {
   db.exec('ALTER TABLE orders ADD COLUMN delivery_cost INTEGER NOT NULL DEFAULT 0');
+}
+if (!orderColumns.includes('order_code')) {
+  db.exec('ALTER TABLE orders ADD COLUMN order_code TEXT');
+}
+
+// короткий код заказа для покупателя (4 символа, без похожих друг на друга: 0/O, 1/I исключены)
+const ORDER_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function generateOrderCode() {
+  let code;
+  const exists = db.prepare('SELECT 1 FROM orders WHERE order_code = ?');
+  do {
+    code = Array.from({ length: 4 }, () => ORDER_CODE_CHARS[Math.floor(Math.random() * ORDER_CODE_CHARS.length)]).join('');
+  } while (exists.get(code));
+  return code;
+}
+
+// одноразовый бэкфилл кодов для заказов, созданных до появления этой функции
+const ordersWithoutCode = db.prepare('SELECT id FROM orders WHERE order_code IS NULL').all();
+if (ordersWithoutCode.length) {
+  const setCode = db.prepare('UPDATE orders SET order_code = ? WHERE id = ?');
+  for (const o of ordersWithoutCode) {
+    setCode.run(generateOrderCode(), o.id);
+  }
 }
 
 // миграция: английские поля каталога (могли отсутствовать в базе, созданной до i18n)
@@ -292,3 +316,4 @@ module.exports.getName = getName;
 module.exports.setName = setName;
 module.exports.getCityEn = getCityEn;
 module.exports.translateCity = translateCity;
+module.exports.generateOrderCode = generateOrderCode;

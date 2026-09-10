@@ -404,7 +404,7 @@ async function showMyOrders(ctx) {
     const date = (o.created_at || '').slice(0, 16).replace('T', ' ');
     const cityDisplay = db.translateCity(o.delivery_city, lang);
 
-    let text = `<b>${t(lang, 'orderNumber', o.id)}</b>\n`;
+    let text = `<b>${t(lang, 'orderNumber', o.order_code || o.id)}</b>\n`;
     text += `${statusLabel}\n\n`;
     text += `${itemsText}\n\n`;
     if (o.discount_percent > 0) {
@@ -592,11 +592,11 @@ bot.command('markshipped', isOwner, (ctx) => {
   const [, orderId] = ctx.message.text.split(' ');
   if (!orderId) return ctx.reply('Формат: /markshipped <id_заказа>');
   db.prepare("UPDATE orders SET status = 'shipped' WHERE id = ?").run(parseInt(orderId));
-  const order = db.prepare('SELECT chat_id FROM orders WHERE id = ?').get(parseInt(orderId));
+  const order = db.prepare('SELECT chat_id, order_code FROM orders WHERE id = ?').get(parseInt(orderId));
   if (order) {
     const buyerLang = db.getLang(order.chat_id);
     const buyerName = db.getName(order.chat_id);
-    bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', buyerName, orderId));
+    bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', buyerName, order.order_code || orderId));
   }
   ctx.reply(`Заказ #${orderId} помечен как отправленный.`);
 });

@@ -60,7 +60,7 @@ function startWebhookServer(bot) {
 
       const buyerLang = db.getLang(order.chat_id);
       const buyerName = db.getName(order.chat_id);
-      await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'paymentReceived', buyerName, orderId));
+      await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'paymentReceived', buyerName, order.order_code || orderId));
 
       if (process.env.OWNER_CHAT_ID) {
         const itemsText = orderItems
@@ -157,6 +157,7 @@ function startWebhookServer(bot) {
       orders = orders.filter(
         (o) =>
           String(o.id).includes(needle) ||
+          (o.order_code || '').toLowerCase().includes(needle) ||
           String(o.chat_id).includes(needle) ||
           (o.address || '').toLowerCase().includes(needle)
       );
@@ -289,11 +290,11 @@ function startWebhookServer(bot) {
     const { status } = req.body; // paid | shipped | delivered | cancelled
     db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, req.params.id);
     if (status === 'shipped') {
-      const order = db.prepare('SELECT chat_id FROM orders WHERE id = ?').get(req.params.id);
+      const order = db.prepare('SELECT chat_id, order_code FROM orders WHERE id = ?').get(req.params.id);
       if (order) {
         const buyerLang = db.getLang(order.chat_id);
         const buyerName = db.getName(order.chat_id);
-        await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', buyerName, req.params.id));
+        await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', buyerName, order.order_code || req.params.id));
       }
     }
     res.json({ ok: true });
