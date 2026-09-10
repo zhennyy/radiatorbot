@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS products (
   price INTEGER NOT NULL, -- в копейках, чтобы не было проблем с float
   photo_url TEXT,
   stock INTEGER NOT NULL DEFAULT 0,
-  category TEXT
+  category TEXT,
+  name_en TEXT,        -- необязательный английский перевод названия
+  description_en TEXT, -- необязательный английский перевод описания
+  category_en TEXT     -- необязательный английский перевод категории
 );
 
 CREATE TABLE IF NOT EXISTS cart_items (
@@ -93,6 +96,54 @@ if (!orderColumns.includes('delivery_cost')) {
   db.exec('ALTER TABLE orders ADD COLUMN delivery_cost INTEGER NOT NULL DEFAULT 0');
 }
 
+// миграция: английские поля каталога (могли отсутствовать в базе, созданной до i18n)
+const productColumns = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
+if (!productColumns.includes('name_en')) {
+  db.exec('ALTER TABLE products ADD COLUMN name_en TEXT');
+}
+if (!productColumns.includes('description_en')) {
+  db.exec('ALTER TABLE products ADD COLUMN description_en TEXT');
+}
+if (!productColumns.includes('category_en')) {
+  db.exec('ALTER TABLE products ADD COLUMN category_en TEXT');
+}
+
+// одноразовый бэкфилл английских переводов для стартовых демо-товаров
+// (если они уже есть в базе без name_en — например, база создана до появления двуязычности)
+const seedTranslations = {
+  'Радиатор Milano Bianco': {
+    name_en: 'Milano Bianco Radiator',
+    description_en: 'Designer vertical radiator, white, 180x40 cm',
+    category_en: 'Designer',
+  },
+  'Радиатор Nova Grande': {
+    name_en: 'Nova Grande Radiator',
+    description_en: 'Steel panel radiator, anthracite, 60x100 cm',
+    category_en: 'Steel',
+  },
+  'Полотенцесушитель Elegance': {
+    name_en: 'Elegance Towel Warmer',
+    description_en: 'Water-heated towel warmer, chrome, ladder-style 50x80 cm',
+    category_en: 'Towel warmers',
+  },
+  'Радиатор Loft Black': {
+    name_en: 'Loft Black Radiator',
+    description_en: 'Tubular loft-style radiator, matte black, 200x60 cm',
+    category_en: 'Designer',
+  },
+  'Радиатор Classic Alu': {
+    name_en: 'Classic Alu Radiator',
+    description_en: 'Aluminium sectional radiator, white, 1 section',
+    category_en: 'Sectional',
+  },
+};
+const backfillEn = db.prepare(
+  'UPDATE products SET name_en = ?, description_en = ?, category_en = ? WHERE name = ? AND name_en IS NULL'
+);
+for (const [ruName, tr] of Object.entries(seedTranslations)) {
+  backfillEn.run(tr.name_en, tr.description_en, tr.category_en, ruName);
+}
+
 // дефолтный тариф на доставку для городов, которых нет в списке delivery_rates
 const DEFAULT_DELIVERY_PRICE = 150000; // 1500 ₽
 
@@ -112,7 +163,7 @@ if (deliveryCount === 0) {
 const count = db.prepare('SELECT COUNT(*) AS c FROM products').get().c;
 if (count === 0) {
   const insert = db.prepare(
-    'INSERT INTO products (name, description, price, photo_url, stock, category) VALUES (?,?,?,?,?,?)'
+    'INSERT INTO products (name, description, price, photo_url, stock, category, name_en, description_en, category_en) VALUES (?,?,?,?,?,?,?,?,?)'
   );
   insert.run(
     'Радиатор Milano Bianco',
@@ -120,7 +171,10 @@ if (count === 0) {
     1490000, // 14 900 ₽
     null,
     8,
-    'Дизайнерские'
+    'Дизайнерские',
+    'Milano Bianco Radiator',
+    'Designer vertical radiator, white, 180x40 cm',
+    'Designer'
   );
   insert.run(
     'Радиатор Nova Grande',
@@ -128,7 +182,10 @@ if (count === 0) {
     890000, // 8 900 ₽
     null,
     15,
-    'Стальные'
+    'Стальные',
+    'Nova Grande Radiator',
+    'Steel panel radiator, anthracite, 60x100 cm',
+    'Steel'
   );
   insert.run(
     'Полотенцесушитель Elegance',
@@ -136,7 +193,10 @@ if (count === 0) {
     650000, // 6 500 ₽
     null,
     20,
-    'Полотенцесушители'
+    'Полотенцесушители',
+    'Elegance Towel Warmer',
+    'Water-heated towel warmer, chrome, ladder-style 50x80 cm',
+    'Towel warmers'
   );
   insert.run(
     'Радиатор Loft Black',
@@ -144,7 +204,10 @@ if (count === 0) {
     2190000, // 21 900 ₽
     null,
     5,
-    'Дизайнерские'
+    'Дизайнерские',
+    'Loft Black Radiator',
+    'Tubular loft-style radiator, matte black, 200x60 cm',
+    'Designer'
   );
   insert.run(
     'Радиатор Classic Alu',
@@ -152,7 +215,10 @@ if (count === 0) {
     120000, // 1 200 ₽ за секцию
     null,
     100,
-    'Секционные'
+    'Секционные',
+    'Classic Alu Radiator',
+    'Aluminium sectional radiator, white, 1 section',
+    'Sectional'
   );
 }
 

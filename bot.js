@@ -78,12 +78,16 @@ function escapeHtml(s) {
 }
 
 async function renderProductCard(ctx, p, lang) {
+  const name = (lang === 'en' && p.name_en) || p.name;
+  const description = (lang === 'en' && p.description_en) || p.description;
+  const category = (lang === 'en' && p.category_en) || p.category;
+
   const stockLine = p.stock > 0 ? t(lang, 'inStock', p.stock) : t(lang, 'outOfStock');
 
   const caption =
-    `🔥 <b>${escapeHtml(p.name)}</b>\n` +
-    (p.description ? `<i>${escapeHtml(p.description)}</i>\n\n` : '\n') +
-    `🏷 ${escapeHtml(p.category)}\n` +
+    `🔥 <b>${escapeHtml(name)}</b>\n` +
+    (description ? `<i>${escapeHtml(description)}</i>\n\n` : '\n') +
+    `🏷 ${escapeHtml(category)}\n` +
     `${t(lang, 'priceLabel')} <b>${formatPrice(p.price)}</b>\n` +
     stockLine;
 
@@ -133,13 +137,14 @@ bot.action(/^page_(\d+)(?:_c(\d+))?$/, (ctx) => {
 
 bot.hears([t('ru', 'btnCategories'), t('en', 'btnCategories')], async (ctx) => {
   const lang = db.getLang(ctx.chat.id);
-  const categories = db
-    .prepare('SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category')
-    .all()
-    .map((r) => r.category);
-  if (!categories.length) return ctx.reply(t(lang, 'noCategories'), buildMainMenu(lang));
-  ctx.session.catList = categories;
-  const buttons = categories.map((c, i) => [Markup.button.callback(c, `cat_${i}`)]);
+  const rows = db
+    .prepare('SELECT DISTINCT category, category_en FROM products WHERE category IS NOT NULL ORDER BY category')
+    .all();
+  if (!rows.length) return ctx.reply(t(lang, 'noCategories'), buildMainMenu(lang));
+  ctx.session.catList = rows.map((r) => r.category); // фильтруем всегда по русскому значению в БД
+  const buttons = rows.map((r, i) => [
+    Markup.button.callback((lang === 'en' && r.category_en) || r.category, `cat_${i}`),
+  ]);
   await ctx.reply(t(lang, 'categoriesPrompt'), Markup.inlineKeyboard(buttons));
   await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
 });
@@ -168,8 +173,8 @@ bot.on('text', async (ctx, next) => {
     const term = ctx.message.text.trim();
     if (!term) return;
     const products = db
-      .prepare('SELECT * FROM products WHERE name LIKE ? ORDER BY name LIMIT 20')
-      .all(`%${term}%`);
+      .prepare('SELECT * FROM products WHERE name LIKE ? OR name_en LIKE ? ORDER BY name LIMIT 20')
+      .all(`%${term}%`, `%${term}%`);
     if (!products.length) return ctx.reply(t(lang, 'searchNoResults', term), buildMainMenu(lang));
     for (const p of products) {
       await renderProductCard(ctx, p, lang);

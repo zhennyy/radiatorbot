@@ -92,18 +92,41 @@ function startWebhookServer(bot) {
   });
 
   app.post('/api/products', (req, res) => {
-    const { name, description, price, stock, category, photo_url } = req.body;
+    const { name, description, price, stock, category, photo_url, name_en, description_en, category_en } = req.body;
     const result = db
-      .prepare('INSERT INTO products (name, description, price, stock, category, photo_url) VALUES (?,?,?,?,?,?)')
-      .run(name, description || '', Math.round(price * 100), stock || 0, category || null, photo_url || null);
+      .prepare(
+        'INSERT INTO products (name, description, price, stock, category, photo_url, name_en, description_en, category_en) VALUES (?,?,?,?,?,?,?,?,?)'
+      )
+      .run(
+        name,
+        description || '',
+        Math.round(price * 100),
+        stock || 0,
+        category || null,
+        photo_url || null,
+        name_en || null,
+        description_en || null,
+        category_en || null
+      );
     res.json({ id: result.lastInsertRowid });
   });
 
   app.put('/api/products/:id', (req, res) => {
-    const { name, description, price, stock, category, photo_url } = req.body;
+    const { name, description, price, stock, category, photo_url, name_en, description_en, category_en } = req.body;
     db.prepare(
-      'UPDATE products SET name=?, description=?, price=?, stock=?, category=?, photo_url=? WHERE id=?'
-    ).run(name, description, Math.round(price * 100), stock, category, photo_url || null, req.params.id);
+      'UPDATE products SET name=?, description=?, price=?, stock=?, category=?, photo_url=?, name_en=?, description_en=?, category_en=? WHERE id=?'
+    ).run(
+      name,
+      description,
+      Math.round(price * 100),
+      stock,
+      category,
+      photo_url || null,
+      name_en || null,
+      description_en || null,
+      category_en || null,
+      req.params.id
+    );
     res.json({ ok: true });
   });
 
