@@ -18,6 +18,13 @@ function formatPrice(kopecks) {
   return (kopecks / 100).toFixed(0) + ' ₽';
 }
 
+// Постоянная клавиатура снизу — переприсылаем её после каждого раздела,
+// чтобы она не пропадала, даже если Telegram-клиент её случайно скрыл
+const mainMenu = Markup.keyboard([
+  ['📦 Каталог', '🔍 Поиск'],
+  ['📂 Категории', '🛒 Корзина'],
+]).resize();
+
 function getCatalogPage(page = 0, category = null) {
   const where = category ? 'WHERE category = ?' : '';
   const params = category ? [category] : [];
@@ -29,13 +36,7 @@ function getCatalogPage(page = 0, category = null) {
 }
 
 bot.start((ctx) => {
-  ctx.reply(
-    'Добро пожаловать в магазин RadiatorPro 🔥\nВыберите раздел:',
-    Markup.keyboard([
-      ['📦 Каталог', '🔍 Поиск'],
-      ['📂 Категории', '🛒 Корзина'],
-    ]).resize()
-  );
+  ctx.reply('Добро пожаловать в магазин RadiatorPro 🔥\nВыберите раздел:', mainMenu);
 });
 
 bot.hears('📦 Каталог', (ctx) => sendCatalogPage(ctx, 0));
@@ -57,7 +58,7 @@ async function renderProductCard(ctx, p) {
 
 async function sendCatalogPage(ctx, page, category = null) {
   const { products, hasNext, hasPrev } = getCatalogPage(page, category);
-  if (!products.length) return ctx.reply('Товаров не найдено.');
+  if (!products.length) return ctx.reply('Товаров не найдено.', mainMenu);
 
   for (const p of products) {
     await renderProductCard(ctx, p);
@@ -70,6 +71,8 @@ async function sendCatalogPage(ctx, page, category = null) {
   if (hasPrev) navButtons.push(Markup.button.callback('⬅️', `page_${page - 1}${catSuffix}`));
   if (hasNext) navButtons.push(Markup.button.callback('➡️', `page_${page + 1}${catSuffix}`));
   if (navButtons.length) await ctx.reply('Листать:', Markup.inlineKeyboard(navButtons));
+
+  await ctx.reply('Меню 👇', mainMenu);
 }
 
 bot.action(/^page_(\d+)(?:_c(\d+))?$/, (ctx) => {
@@ -82,15 +85,16 @@ bot.action(/^page_(\d+)(?:_c(\d+))?$/, (ctx) => {
 
 // === Категории ===
 
-bot.hears('📂 Категории', (ctx) => {
+bot.hears('📂 Категории', async (ctx) => {
   const categories = db
     .prepare('SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category')
     .all()
     .map((r) => r.category);
-  if (!categories.length) return ctx.reply('Категории пока не заданы.');
+  if (!categories.length) return ctx.reply('Категории пока не заданы.', mainMenu);
   ctx.session.catList = categories;
   const buttons = categories.map((c, i) => [Markup.button.callback(c, `cat_${i}`)]);
-  ctx.reply('Выберите категорию:', Markup.inlineKeyboard(buttons));
+  await ctx.reply('Выберите категорию:', Markup.inlineKeyboard(buttons));
+  await ctx.reply('Меню 👇', mainMenu);
 });
 
 bot.action(/^cat_(\d+)$/, (ctx) => {
@@ -104,7 +108,7 @@ bot.action(/^cat_(\d+)$/, (ctx) => {
 
 bot.hears('🔍 Поиск', (ctx) => {
   ctx.session.awaitingSearch = true;
-  ctx.reply('Введите название товара (или часть названия) для поиска:');
+  ctx.reply('Введите название товара (или часть названия) для поиска:', mainMenu);
 });
 
 bot.on('text', async (ctx) => {
@@ -115,10 +119,11 @@ bot.on('text', async (ctx) => {
   const products = db
     .prepare('SELECT * FROM products WHERE name LIKE ? ORDER BY name LIMIT 20')
     .all(`%${term}%`);
-  if (!products.length) return ctx.reply(`Ничего не найдено по запросу «${term}».`);
+  if (!products.length) return ctx.reply(`Ничего не найдено по запросу «${term}».`, mainMenu);
   for (const p of products) {
     await renderProductCard(ctx, p);
   }
+  await ctx.reply('Меню 👇', mainMenu);
 });
 
 // === Корзина ===
@@ -149,7 +154,7 @@ bot.command('cart', showCart);
 async function showCart(ctx) {
   const chatId = ctx.chat.id;
   const { items, total } = getCart(chatId);
-  if (!items.length) return ctx.reply('Корзина пуста.');
+  if (!items.length) return ctx.reply('Корзина пуста.', mainMenu);
 
   let text = 'Ваша корзина:\n\n';
   const buttons = [];
@@ -164,6 +169,7 @@ async function showCart(ctx) {
   buttons.push([Markup.button.callback('✅ Оформить заказ', 'checkout_start')]);
 
   await ctx.reply(text, Markup.inlineKeyboard(buttons));
+  await ctx.reply('Меню 👇', mainMenu);
 }
 
 bot.action(/dec_(\d+)/, (ctx) => {
