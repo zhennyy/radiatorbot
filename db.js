@@ -47,6 +47,14 @@ CREATE TABLE IF NOT EXISTS promo_codes (
   used_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS delivery_rates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  city TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  price INTEGER NOT NULL, -- в копейках
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 `);
 
 // миграция: добавляем колонки промокода к уже существующей таблице orders
@@ -57,6 +65,27 @@ if (!orderColumns.includes('promo_code')) {
 }
 if (!orderColumns.includes('discount_percent')) {
   db.exec('ALTER TABLE orders ADD COLUMN discount_percent INTEGER NOT NULL DEFAULT 0');
+}
+if (!orderColumns.includes('delivery_city')) {
+  db.exec('ALTER TABLE orders ADD COLUMN delivery_city TEXT');
+}
+if (!orderColumns.includes('delivery_cost')) {
+  db.exec('ALTER TABLE orders ADD COLUMN delivery_cost INTEGER NOT NULL DEFAULT 0');
+}
+
+// дефолтный тариф на доставку для городов, которых нет в списке delivery_rates
+const DEFAULT_DELIVERY_PRICE = 150000; // 1500 ₽
+
+// сидим стартовые тарифы, если таблица пуста
+const deliveryCount = db.prepare('SELECT COUNT(*) AS c FROM delivery_rates').get().c;
+if (deliveryCount === 0) {
+  const insertRate = db.prepare('INSERT INTO delivery_rates (city, price) VALUES (?,?)');
+  insertRate.run('Санкт-Петербург', 40000); // 400 ₽ — свой город
+  insertRate.run('Москва', 70000); // 700 ₽
+  insertRate.run('Великий Новгород', 70000);
+  insertRate.run('Псков', 70000);
+  insertRate.run('Петрозаводск', 70000);
+  insertRate.run('Вологда', 70000);
 }
 
 // сидим тестовые товары, если каталог пуст
@@ -108,3 +137,4 @@ if (count === 0) {
 }
 
 module.exports = db;
+module.exports.DEFAULT_DELIVERY_PRICE = 150000; // 1500 ₽

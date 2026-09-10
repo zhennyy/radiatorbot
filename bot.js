@@ -356,6 +356,11 @@ async function showMyOrders(ctx) {
     if (o.discount_percent > 0) {
       text += `Промокод «${o.promo_code}»: −${o.discount_percent}%\n`;
     }
+    if (o.delivery_cost > 0) {
+      text += `🚚 Доставка${o.delivery_city ? ` (${o.delivery_city})` : ''}: ${formatPrice(o.delivery_cost)}\n`;
+    } else if (o.delivery_city === null && o.address === 'Самовывоз') {
+      text += `🚚 Самовывоз\n`;
+    }
     text += `💰 Сумма: <b>${formatPrice(o.total)}</b>\n`;
     text += `📍 ${o.address || '—'}\n`;
     text += `🕐 ${date}`;
@@ -392,6 +397,11 @@ bot.command('orders', isOwner, async (ctx) => {
     text += `${statusLabel}\n\n`;
     if (o.discount_percent > 0) {
       text += `Промокод «${o.promo_code}»: −${o.discount_percent}%\n`;
+    }
+    if (o.delivery_cost > 0) {
+      text += `🚚 Доставка${o.delivery_city ? ` (${o.delivery_city})` : ''}: ${formatPrice(o.delivery_cost)}\n`;
+    } else if (o.delivery_city === null && o.address === 'Самовывоз') {
+      text += `🚚 Самовывоз\n`;
     }
     text += `💰 Сумма: <b>${formatPrice(o.total)}</b>\n`;
     text += `📍 ${o.address || '—'}\n`;
@@ -458,6 +468,50 @@ bot.command('delpromo', isOwner, (ctx) => {
   if (!code) return ctx.reply('Формат: /delpromo КОД');
   const result = db.prepare('UPDATE promo_codes SET active = 0 WHERE code = ? COLLATE NOCASE').run(code);
   ctx.reply(result.changes ? `Промокод "${code.toUpperCase()}" выключен.` : `Промокод "${code.toUpperCase()}" не найден.`);
+});
+
+// === Тарифы доставки (только для владельца) ===
+
+bot.command('adddelivery', isOwner, (ctx) => {
+  // формат: /adddelivery Город Цена  (например: /adddelivery Казань 900)
+  const raw = ctx.message.text.replace('/adddelivery', '').trim();
+  const parts = raw.split(' ');
+  const priceRub = parts.pop();
+  const city = parts.join(' ').trim();
+  const price = parseFloat(priceRub);
+  if (!city || !priceRub || Number.isNaN(price) || price < 0) {
+    return ctx.reply('Формат: /adddelivery Город Цена\nНапример: /adddelivery Казань 900');
+  }
+  db.prepare(
+    `INSERT INTO delivery_rates (city, price) VALUES (?, ?)
+     ON CONFLICT(city) DO UPDATE SET price = excluded.price, active = 1`
+  ).run(city, Math.round(price * 100));
+  ctx.reply(`Тариф для города "${city}" установлен: ${Math.round(price)} ₽.`);
+});
+
+bot.command('deliveries', isOwner, (ctx) => {
+  const rates = db.prepare('SELECT * FROM delivery_rates ORDER BY city').all();
+  if (!rates.length) return ctx.reply('Тарифы доставки пока не заданы.');
+  const text = rates
+    .map((r) => `${r.city} — ${formatPrice(r.price)}${r.active ? '' : ' (выключен)'}`)
+    .join('\n');
+  ctx.reply(
+    `${text}\n\nДля городов не из списка действует тариф по умолчанию: ${formatPrice(
+      db.DEFAULT_DELIVERY_PRICE
+    )}.`
+  );
+});
+
+bot.command('deldelivery', isOwner, (ctx) => {
+  // формат: /deldelivery Город
+  const city = ctx.message.text.replace('/deldelivery', '').trim();
+  if (!city) return ctx.reply('Формат: /deldelivery Город');
+  const result = db
+    .prepare('UPDATE delivery_rates SET active = 0 WHERE city = ? COLLATE NOCASE')
+    .run(city);
+  ctx.reply(
+    result.changes ? `Тариф для города "${city}" выключен.` : `Город "${city}" не найден в списке тарифов.`
+  );
 });
 
 bot.command('stock', isOwner, (ctx) => {
