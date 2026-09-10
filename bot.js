@@ -31,40 +31,94 @@ function getCatalogPage(page = 0, category = null) {
 bot.start((ctx) => {
   ctx.reply(
     'Добро пожаловать в магазин RadiatorPro 🔥\nВыберите раздел:',
-    Markup.keyboard(['📦 Каталог', '🛒 Корзина']).resize()
+    Markup.keyboard([
+      ['📦 Каталог', '🔍 Поиск'],
+      ['📂 Категории', '🛒 Корзина'],
+    ]).resize()
   );
 });
 
 bot.hears('📦 Каталог', (ctx) => sendCatalogPage(ctx, 0));
 bot.command('catalog', (ctx) => sendCatalogPage(ctx, 0));
 
-async function sendCatalogPage(ctx, page) {
-  const { products, hasNext, hasPrev } = getCatalogPage(page);
-  if (!products.length) return ctx.reply('Каталог пуст.');
+async function renderProductCard(ctx, p) {
+  const caption = `${p.name}\n${p.description || ''}\nКатегория: ${p.category}\nЦена: ${formatPrice(p.price)}\nВ наличии: ${p.stock} шт.`;
+  const keyboard = Markup.inlineKeyboard([
+    Markup.button.callback('➕ В корзину', `add_${p.id}`),
+  ]);
+  if (p.photo_url) {
+    await ctx.replyWithPhoto(p.photo_url, { caption, ...keyboard }).catch(() =>
+      ctx.reply(caption, keyboard)
+    );
+  } else {
+    await ctx.reply(caption, keyboard);
+  }
+}
+
+async function sendCatalogPage(ctx, page, category = null) {
+  const { products, hasNext, hasPrev } = getCatalogPage(page, category);
+  if (!products.length) return ctx.reply('Товаров не найдено.');
 
   for (const p of products) {
-    const caption = `${p.name}\n${p.description || ''}\nКатегория: ${p.category}\nЦена: ${formatPrice(p.price)}\nВ наличии: ${p.stock} шт.`;
-    const keyboard = Markup.inlineKeyboard([
-      Markup.button.callback('➕ В корзину', `add_${p.id}`),
-    ]);
-    if (p.photo_url) {
-      await ctx.replyWithPhoto(p.photo_url, { caption, ...keyboard }).catch(() =>
-        ctx.reply(caption, keyboard)
-      );
-    } else {
-      await ctx.reply(caption, keyboard);
-    }
+    await renderProductCard(ctx, p);
   }
 
+  const catIndex = category && ctx.session?.catList ? ctx.session.catList.indexOf(category) : -1;
+  const catSuffix = catIndex >= 0 ? `_c${catIndex}` : '';
+
   const navButtons = [];
-  if (hasPrev) navButtons.push(Markup.button.callback('⬅️', `page_${page - 1}`));
-  if (hasNext) navButtons.push(Markup.button.callback('➡️', `page_${page + 1}`));
+  if (hasPrev) navButtons.push(Markup.button.callback('⬅️', `page_${page - 1}${catSuffix}`));
+  if (hasNext) navButtons.push(Markup.button.callback('➡️', `page_${page + 1}${catSuffix}`));
   if (navButtons.length) await ctx.reply('Листать:', Markup.inlineKeyboard(navButtons));
 }
 
-bot.action(/page_(\d+)/, (ctx) => {
+bot.action(/^page_(\d+)(?:_c(\d+))?$/, (ctx) => {
   ctx.answerCbQuery();
-  sendCatalogPage(ctx, parseInt(ctx.match[1], 10));
+  const page = parseInt(ctx.match[1], 10);
+  const category =
+    ctx.match[2] !== undefined ? ctx.session?.catList?.[parseInt(ctx.match[2], 10)] || null : null;
+  sendCatalogPage(ctx, page, category);
+});
+
+// === Категории ===
+
+bot.hears('📂 Категории', (ctx) => {
+  const categories = db
+    .prepare('SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category')
+    .all()
+    .map((r) => r.category);
+  if (!categories.length) return ctx.reply('Категории пока не заданы.');
+  ctx.session.catList = categories;
+  const buttons = categories.map((c, i) => [Markup.button.callback(c, `cat_${i}`)]);
+  ctx.reply('Выберите категорию:', Markup.inlineKeyboard(buttons));
+});
+
+bot.action(/^cat_(\d+)$/, (ctx) => {
+  ctx.answerCbQuery();
+  const category = ctx.session?.catList?.[parseInt(ctx.match[1], 10)];
+  if (!category) return ctx.reply('Список категорий устарел, откройте его заново: 📂 Категории');
+  sendCatalogPage(ctx, 0, category);
+});
+
+// === Поиск по названию ===
+
+bot.hears('🔍 Поиск', (ctx) => {
+  ctx.session.awaitingSearch = true;
+  ctx.reply('Введите название товара (или часть названия) для поиска:');
+});
+
+bot.on('text', async (ctx) => {
+  if (!ctx.session?.awaitingSearch) return;
+  ctx.session.awaitingSearch = false;
+  const term = ctx.message.text.trim();
+  if (!term) return;
+  const products = db
+    .prepare('SELECT * FROM products WHERE name LIKE ? ORDER BY name LIMIT 20')
+    .all(`%${term}%`);
+  if (!products.length) return ctx.reply(`Ничего не найдено по запросу «${term}».`);
+  for (const p of products) {
+    await renderProductCard(ctx, p);
+  }
 });
 
 // === Корзина ===
