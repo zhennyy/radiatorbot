@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS promo_codes (
 CREATE TABLE IF NOT EXISTS delivery_rates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   city TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  city_en TEXT,
   price INTEGER NOT NULL, -- в копейках
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -78,6 +79,23 @@ function setLang(chatId, lang) {
     `INSERT INTO user_settings (chat_id, lang) VALUES (?, ?)
      ON CONFLICT(chat_id) DO UPDATE SET lang = excluded.lang`
   ).run(chatId, lang);
+}
+
+// найти английское название города доставки по русскому (для истории заказов —
+// orders.delivery_city хранит текст на момент заказа, а не ссылку на delivery_rates)
+function getCityEn(city) {
+  if (!city) return null;
+  const row = db
+    .prepare('SELECT city_en FROM delivery_rates WHERE city = ? COLLATE NOCASE')
+    .get(city);
+  return row ? row.city_en : null;
+}
+
+// перевести название города для отображения покупателю/в админке (с фоллбеком на русское)
+function translateCity(city, lang) {
+  if (!city) return city;
+  if (lang !== 'en') return city;
+  return getCityEn(city) || city;
 }
 
 // миграция: добавляем колонки промокода к уже существующей таблице orders
@@ -144,19 +162,41 @@ for (const [ruName, tr] of Object.entries(seedTranslations)) {
   backfillEn.run(tr.name_en, tr.description_en, tr.category_en, ruName);
 }
 
+// миграция: английское название города доставки (могло отсутствовать в базе, созданной до i18n)
+const deliveryColumns = db.prepare('PRAGMA table_info(delivery_rates)').all().map((c) => c.name);
+if (!deliveryColumns.includes('city_en')) {
+  db.exec('ALTER TABLE delivery_rates ADD COLUMN city_en TEXT');
+}
+
+// одноразовый бэкфилл английских названий для стартовых городов доставки
+const citySeedTranslations = {
+  'Санкт-Петербург': 'Saint Petersburg',
+  'Москва': 'Moscow',
+  'Великий Новгород': 'Veliky Novgorod',
+  'Псков': 'Pskov',
+  'Петрозаводск': 'Petrozavodsk',
+  'Вологда': 'Vologda',
+};
+const backfillCityEn = db.prepare(
+  'UPDATE delivery_rates SET city_en = ? WHERE city = ? COLLATE NOCASE AND city_en IS NULL'
+);
+for (const [ruCity, cityEn] of Object.entries(citySeedTranslations)) {
+  backfillCityEn.run(cityEn, ruCity);
+}
+
 // дефолтный тариф на доставку для городов, которых нет в списке delivery_rates
 const DEFAULT_DELIVERY_PRICE = 150000; // 1500 ₽
 
 // сидим стартовые тарифы, если таблица пуста
 const deliveryCount = db.prepare('SELECT COUNT(*) AS c FROM delivery_rates').get().c;
 if (deliveryCount === 0) {
-  const insertRate = db.prepare('INSERT INTO delivery_rates (city, price) VALUES (?,?)');
-  insertRate.run('Санкт-Петербург', 40000); // 400 ₽ — свой город
-  insertRate.run('Москва', 70000); // 700 ₽
-  insertRate.run('Великий Новгород', 70000);
-  insertRate.run('Псков', 70000);
-  insertRate.run('Петрозаводск', 70000);
-  insertRate.run('Вологда', 70000);
+  const insertRate = db.prepare('INSERT INTO delivery_rates (city, city_en, price) VALUES (?,?,?)');
+  insertRate.run('Санкт-Петербург', 'Saint Petersburg', 40000); // 400 ₽ — свой город
+  insertRate.run('Москва', 'Moscow', 70000); // 700 ₽
+  insertRate.run('Великий Новгород', 'Veliky Novgorod', 70000);
+  insertRate.run('Псков', 'Pskov', 70000);
+  insertRate.run('Петрозаводск', 'Petrozavodsk', 70000);
+  insertRate.run('Вологда', 'Vologda', 70000);
 }
 
 // сидим тестовые товары, если каталог пуст
@@ -226,3 +266,5 @@ module.exports = db;
 module.exports.DEFAULT_DELIVERY_PRICE = 150000; // 1500 ₽
 module.exports.getLang = getLang;
 module.exports.setLang = setLang;
+module.exports.getCityEn = getCityEn;
+module.exports.translateCity = translateCity;

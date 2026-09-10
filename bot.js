@@ -314,9 +314,10 @@ async function showCart(ctx) {
   let text = t(lang, 'cartTitle');
   const buttons = [];
   for (const i of items) {
-    text += `${i.name} x${i.quantity} — ${formatPrice(i.price * i.quantity)}\n`;
+    const displayName = (lang === 'en' && i.name_en) || i.name;
+    text += `${displayName} x${i.quantity} — ${formatPrice(i.price * i.quantity)}\n`;
     buttons.push([
-      Markup.button.callback(`➖ ${i.name}`, `dec_${i.product_id}`),
+      Markup.button.callback(`➖ ${displayName}`, `dec_${i.product_id}`),
       Markup.button.callback(`❌`, `rm_${i.product_id}`),
     ]);
   }
@@ -366,7 +367,7 @@ async function showMyOrders(ctx) {
   if (!orders.length) return ctx.reply(t(lang, 'ordersEmpty'), buildMainMenu(lang));
 
   const itemsStmt = db.prepare(
-    `SELECT oi.quantity, p.name FROM order_items oi
+    `SELECT oi.quantity, p.name, p.name_en FROM order_items oi
      JOIN products p ON p.id = oi.product_id
      WHERE oi.order_id = ?`
   );
@@ -377,8 +378,11 @@ async function showMyOrders(ctx) {
     const statusKey = (o.status || '').split(':')[0];
     const statusLabel = t(lang, 'orderStatus')[statusKey] || statusKey;
     const items = itemsStmt.all(o.id);
-    const itemsText = items.map((i) => `• ${i.name} ×${i.quantity}`).join('\n');
+    const itemsText = items
+      .map((i) => `• ${(lang === 'en' && i.name_en) || i.name} ×${i.quantity}`)
+      .join('\n');
     const date = (o.created_at || '').slice(0, 16).replace('T', ' ');
+    const cityDisplay = db.translateCity(o.delivery_city, lang);
 
     let text = `<b>${t(lang, 'orderNumber', o.id)}</b>\n`;
     text += `${statusLabel}\n\n`;
@@ -387,7 +391,7 @@ async function showMyOrders(ctx) {
       text += `${t(lang, 'promoLine', o.promo_code, o.discount_percent)}\n`;
     }
     if (o.delivery_cost > 0) {
-      text += `${t(lang, 'deliveryLine', o.delivery_city, formatPrice(o.delivery_cost))}\n`;
+      text += `${t(lang, 'deliveryLine', cityDisplay, formatPrice(o.delivery_cost))}\n`;
     } else if (o.delivery_city === null && (o.address === 'Самовывоз' || o.address === 'Pickup')) {
       text += `${t(lang, 'pickupLine')}\n`;
     }

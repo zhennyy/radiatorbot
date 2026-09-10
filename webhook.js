@@ -164,12 +164,13 @@ function startWebhookServer(bot) {
 
     const items = db
       .prepare(
-        `SELECT oi.order_id, oi.quantity, oi.price, p.name FROM order_items oi
+        `SELECT oi.order_id, oi.quantity, oi.price, p.name, p.name_en FROM order_items oi
          JOIN products p ON p.id = oi.product_id`
       )
       .all();
     return orders.map((o) => ({
       ...o,
+      delivery_city_en: db.getCityEn(o.delivery_city),
       items: items.filter((i) => i.order_id === o.id),
     }));
   }
@@ -219,11 +220,11 @@ function startWebhookServer(bot) {
     if (!order) return res.status(404).json({ error: 'Заказ не найден.' });
     const items = db
       .prepare(
-        `SELECT oi.quantity, oi.price, p.name, p.photo_url FROM order_items oi
+        `SELECT oi.quantity, oi.price, p.name, p.name_en, p.photo_url FROM order_items oi
          JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`
       )
       .all(order.id);
-    res.json({ ...order, items });
+    res.json({ ...order, delivery_city_en: db.getCityEn(order.delivery_city), items });
   });
 
   const STATUS_LABEL_RU = {
@@ -340,15 +341,18 @@ function startWebhookServer(bot) {
   });
 
   app.post('/api/delivery', (req, res) => {
-    const { city, price } = req.body;
+    const { city, city_en, price } = req.body;
     const priceRub = parseFloat(price);
     if (!city || !priceRub || priceRub < 0) {
       return res.status(400).json({ error: 'Укажите город и цену.' });
     }
     db.prepare(
-      `INSERT INTO delivery_rates (city, price) VALUES (?, ?)
-       ON CONFLICT(city) DO UPDATE SET price = excluded.price, active = 1`
-    ).run(city.trim(), Math.round(priceRub * 100));
+      `INSERT INTO delivery_rates (city, city_en, price) VALUES (?, ?, ?)
+       ON CONFLICT(city) DO UPDATE SET
+         city_en = COALESCE(excluded.city_en, delivery_rates.city_en),
+         price = excluded.price,
+         active = 1`
+    ).run(city.trim(), (city_en || '').trim() || null, Math.round(priceRub * 100));
     res.json({ ok: true });
   });
 
@@ -356,6 +360,16 @@ function startWebhookServer(bot) {
     const { active } = req.body;
     db.prepare('UPDATE delivery_rates SET active = ? WHERE city = ? COLLATE NOCASE').run(
       active ? 1 : 0,
+      req.params.city
+    );
+    res.json({ ok: true });
+  });
+
+  // обновить только английское название города (используется кнопкой "🌐 EN" в админке)
+  app.put('/api/delivery/:city/english', (req, res) => {
+    const { city_en } = req.body;
+    db.prepare('UPDATE delivery_rates SET city_en = ? WHERE city = ? COLLATE NOCASE').run(
+      (city_en || '').trim() || null,
       req.params.city
     );
     res.json({ ok: true });

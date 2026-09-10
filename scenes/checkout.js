@@ -15,7 +15,7 @@ function getDeliveryPrice(city) {
 
 function buildCityKeyboard(cityOptions, lang) {
   const cityButtons = cityOptions.map((opt, i) =>
-    Markup.button.callback(opt.city, `deliv_city_${i}`)
+    Markup.button.callback((lang === 'en' && opt.city_en) || opt.city, `deliv_city_${i}`)
   );
   const rows = [];
   for (let i = 0; i < cityButtons.length; i += 2) {
@@ -40,13 +40,13 @@ const checkoutScene = new Scenes.WizardScene(
     for (const i of items) {
       const p = db.prepare('SELECT stock FROM products WHERE id = ?').get(i.product_id);
       if (p.stock < i.quantity) {
-        await ctx.reply(t(lang, 'insufficientStock', i.name, p.stock));
+        await ctx.reply(t(lang, 'insufficientStock', (lang === 'en' && i.name_en) || i.name, p.stock));
         return ctx.scene.leave();
       }
     }
 
     const cityOptions = db
-      .prepare('SELECT city, price FROM delivery_rates WHERE active = 1 ORDER BY city')
+      .prepare('SELECT city, city_en, price FROM delivery_rates WHERE active = 1 ORDER BY city')
       .all();
     ctx.wizard.state.cityOptions = cityOptions;
 
@@ -120,7 +120,7 @@ const checkoutScene = new Scenes.WizardScene(
 
       const { items } = getCart(ctx.chat.id);
       let summary = `${t(lang, 'summaryAddress', ctx.wizard.state.address)}\n\n${t(lang, 'summaryOrderHeader')}\n`;
-      for (const i of items) summary += `${i.name} x${i.quantity}\n`;
+      for (const i of items) summary += `${(lang === 'en' && i.name_en) || i.name} x${i.quantity}\n`;
       summary += t(lang, 'itemsSum', (total / 100).toFixed(0) + ' ₽');
       if (discountPercent > 0) {
         summary += `\n${t(lang, 'promoLine', promoCode, discountPercent)}`;
@@ -128,7 +128,7 @@ const checkoutScene = new Scenes.WizardScene(
       summary += t(
         lang,
         'deliverySummary',
-        ctx.wizard.state.deliveryCity,
+        db.translateCity(ctx.wizard.state.deliveryCity, lang),
         deliveryCost > 0 ? (deliveryCost / 100).toFixed(0) + ' ₽' : t(lang, 'deliveryFree')
       );
       summary += t(lang, 'totalSummary', (grandTotal / 100).toFixed(0) + ' ₽');
@@ -163,7 +163,7 @@ checkoutScene.action(/^deliv_city_(\d+)$/, async (ctx) => {
   }
   ctx.wizard.state.deliveryCity = opt.city;
   ctx.wizard.state.deliveryCost = opt.price;
-  await ctx.reply(t(lang, 'cityLabel', opt.city));
+  await ctx.reply(t(lang, 'cityLabel', (lang === 'en' && opt.city_en) || opt.city));
   ctx.wizard.selectStep(2);
 });
 

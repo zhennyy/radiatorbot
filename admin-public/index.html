@@ -240,6 +240,7 @@
       <h2 data-i18n="addDeliveryHeader">Добавить/изменить тариф</h2>
       <div class="form-row">
         <input id="dl-city" data-i18n-ph="phCity" placeholder="Город" style="width: 200px;">
+        <input id="dl-city-en" data-i18n-ph="phCityEn" placeholder="Город на англ. (необязательно)" style="width: 200px;">
         <input id="dl-price" data-i18n-ph="phPrice" placeholder="Цена, ₽" type="number" min="0">
         <button class="primary" data-i18n="btnSave" onclick="addDelivery()">Сохранить</button>
       </div>
@@ -277,6 +278,7 @@ const ADMIN_STRINGS = {
     phName: 'Название', phPrice: 'Цена, ₽', phStock: 'Остаток', phCategory: 'Категория',
     phPhoto: 'Ссылка на фото (URL) или загрузите файл',
     phNameEn: 'Название на англ. (необязательно)', phCategoryEn: 'Категория на англ. (необязательно)',
+    phCityEn: 'Город на англ. (необязательно)',
     phSearch: 'Поиск: № заказа, адрес, chat ID',
     phPromoCode: 'Код (например SALE10)', phPromoPercent: 'Скидка, %', phPromoMax: 'Лимит использований (опц.)',
     phCity: 'Город',
@@ -299,6 +301,7 @@ const ADMIN_STRINGS = {
     promptPhotoUrl: 'Ссылка на фото товара:',
     promptNameEn: 'Название на английском (можно оставить пустым):',
     promptCategoryEn: 'Категория на английском (можно оставить пустым):',
+    promptCityEn: 'Название города на английском (можно оставить пустым):',
     toastNameAndPrice: 'Укажите название и цену.',
     toastEnglishSaved: 'Английский перевод сохранён ✅',
 
@@ -345,6 +348,7 @@ const ADMIN_STRINGS = {
     phName: 'Name', phPrice: 'Price, ₽', phStock: 'Stock', phCategory: 'Category',
     phPhoto: 'Photo URL or upload a file',
     phNameEn: 'English name (optional)', phCategoryEn: 'English category (optional)',
+    phCityEn: 'English city name (optional)',
     phSearch: 'Search: order #, address, chat ID',
     phPromoCode: 'Code (e.g. SALE10)', phPromoPercent: 'Discount, %', phPromoMax: 'Usage limit (optional)',
     phCity: 'City',
@@ -367,6 +371,7 @@ const ADMIN_STRINGS = {
     promptPhotoUrl: 'Product photo URL:',
     promptNameEn: 'English name (can be left blank):',
     promptCategoryEn: 'English category (can be left blank):',
+    promptCityEn: 'City name in English (can be left blank):',
     toastNameAndPrice: 'Please enter a name and price.',
     toastEnglishSaved: 'English translation saved ✅',
 
@@ -627,7 +632,7 @@ async function loadOrders() {
         <td>#${o.id}</td>
         <td><span class="status-pill status-${st}">${label}</span></td>
         <td>${money(o.total)}</td>
-        <td>${o.items.map(i => `${i.name} ×${i.quantity}`).join(', ')}</td>
+        <td>${o.items.map(i => `${(ADMIN_LANG === 'en' && i.name_en) || i.name} ×${i.quantity}`).join(', ')}</td>
         <td>${o.address || '—'}</td>
         <td class="row-actions" onclick="event.stopPropagation()">
           <button onclick="setStatus(${o.id}, 'shipped')">${a('btnShipped')}</button>
@@ -667,7 +672,7 @@ async function openOrderDetail(id) {
   }
   const st = (o.status || '').split(':')[0];
   const label = a('STATUS_LABEL')[st] || st;
-  const itemsHtml = o.items.map(i => `<div><span>${i.name} ×${i.quantity}</span><span>${money(i.price * i.quantity)}</span></div>`).join('');
+  const itemsHtml = o.items.map(i => `<div><span>${(ADMIN_LANG === 'en' && i.name_en) || i.name} ×${i.quantity}</span><span>${money(i.price * i.quantity)}</span></div>`).join('');
   body.innerHTML = `
     <button class="om-close" onclick="closeOrderDetail()">✕</button>
     <h3>${a('orderNumber', o.id)}</h3>
@@ -675,7 +680,7 @@ async function openOrderDetail(id) {
     <div class="om-row"><span class="om-label">${a('thStatus')}</span><span class="status-pill status-${st}">${label}</span></div>
     <div class="om-items">${itemsHtml || `<div>${a('noItems')}</div>`}</div>
     <div class="om-row"><span class="om-label">${a('itemsSum')}</span><span>${money(o.total - (o.delivery_cost || 0))}</span></div>
-    ${o.delivery_cost ? `<div class="om-row"><span class="om-label">${a('delivery')}${o.delivery_city ? ' (' + o.delivery_city + ')' : ''}</span><span>${money(o.delivery_cost)}</span></div>` : ''}
+    ${o.delivery_cost ? `<div class="om-row"><span class="om-label">${a('delivery')}${o.delivery_city ? ' (' + ((ADMIN_LANG === 'en' && o.delivery_city_en) || o.delivery_city) + ')' : ''}</span><span>${money(o.delivery_cost)}</span></div>` : ''}
     <div class="om-row"><span class="om-label">${a('total')}</span><span><b>${money(o.total)}</b></span></div>
     ${o.promo_code ? `<div class="om-row"><span class="om-label">${a('promoCode')}</span><span>${o.promo_code} (−${o.discount_percent}%)</span></div>` : ''}
     <div class="om-row"><span class="om-label">${a('thAddress')}</span><span>${o.address || '—'}</span></div>
@@ -751,10 +756,11 @@ async function loadDelivery() {
   if (!rates.length) { table.innerHTML = `<tr><td class="empty">${a('deliveryEmpty')}</td></tr>`; return; }
   table.innerHTML = `<tr><th>${a('thCity')}</th><th>${a('thPriceRub')}</th><th>${a('thStatus')}</th><th></th></tr>` +
     rates.map(r => `<tr>
-      <td>${r.city}</td>
+      <td>${r.city}${r.city_en ? `<div class="empty" style="margin:0;">EN: ${r.city_en}</div>` : ''}</td>
       <td><input type="number" min="0" value="${Math.round(r.price / 100)}" onchange="updateDeliveryPrice('${r.city.replace(/'/g, "\\'")}', this.value)"></td>
       <td><span class="status-pill ${r.active ? 'status-paid' : 'status-delivered'}">${r.active ? a('promoActive') : a('promoInactive')}</span></td>
       <td class="row-actions">
+        <button onclick="editDeliveryEnglish('${r.city.replace(/'/g, "\\'")}', '${(r.city_en || '').replace(/'/g, "\\'")}')">${a('btnEnglish')}</button>
         ${r.active
           ? `<button class="danger" onclick="toggleDelivery('${r.city}', false)">${a('btnDisable')}</button>`
           : `<button onclick="toggleDelivery('${r.city}', true)">${a('btnEnable')}</button>`}
@@ -773,15 +779,28 @@ async function updateDeliveryPrice(city, price) {
 
 async function addDelivery() {
   const city = document.getElementById('dl-city').value.trim();
+  const cityEn = document.getElementById('dl-city-en')?.value.trim() || '';
   const price = document.getElementById('dl-price').value;
   if (!city || !price) return toast(a('toastCityAndPrice'), 'error');
   const res = await fetch('/api/delivery', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ city, price }),
+    body: JSON.stringify({ city, city_en: cityEn, price }),
   });
   if (!res.ok) { const err = await res.json(); return toast(err.error || a('toastRateSaveFail'), 'error'); }
   document.getElementById('dl-city').value = '';
+  document.getElementById('dl-city-en').value = '';
   document.getElementById('dl-price').value = '';
+  loadDelivery();
+}
+
+async function editDeliveryEnglish(city, currentCityEn) {
+  const cityEn = prompt(a('promptCityEn'), currentCityEn || '');
+  if (cityEn === null) return;
+  await fetch(`/api/delivery/${encodeURIComponent(city)}/english`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ city_en: cityEn.trim() }),
+  });
+  toast(a('toastEnglishSaved'), 'ok');
   loadDelivery();
 }
 
