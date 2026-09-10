@@ -42,17 +42,35 @@ bot.start((ctx) => {
 bot.hears('📦 Каталог', (ctx) => sendCatalogPage(ctx, 0));
 bot.command('catalog', (ctx) => sendCatalogPage(ctx, 0));
 
+function escapeHtml(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 async function renderProductCard(ctx, p) {
-  const caption = `${p.name}\n${p.description || ''}\nКатегория: ${p.category}\nЦена: ${formatPrice(p.price)}\nВ наличии: ${p.stock} шт.`;
-  const keyboard = Markup.inlineKeyboard([
-    Markup.button.callback('➕ В корзину', `add_${p.id}`),
-  ]);
+  const stockLine =
+    p.stock > 0 ? `📦 В наличии: ${p.stock} шт.` : '⛔️ Нет в наличии';
+
+  const caption =
+    `🔥 <b>${escapeHtml(p.name)}</b>\n` +
+    (p.description ? `<i>${escapeHtml(p.description)}</i>\n\n` : '\n') +
+    `🏷 ${escapeHtml(p.category)}\n` +
+    `💰 Цена: <b>${formatPrice(p.price)}</b>\n` +
+    stockLine;
+
+  const extra = {
+    parse_mode: 'HTML',
+    ...Markup.inlineKeyboard([Markup.button.callback('➕ В корзину', `add_${p.id}`)]),
+  };
+
   if (p.photo_url) {
-    await ctx.replyWithPhoto(p.photo_url, { caption, ...keyboard }).catch(() =>
-      ctx.reply(caption, keyboard)
+    await ctx.replyWithPhoto(p.photo_url, { caption, ...extra }).catch(() =>
+      ctx.reply(caption, extra)
     );
   } else {
-    await ctx.reply(caption, keyboard);
+    await ctx.reply(caption, extra);
   }
 }
 
