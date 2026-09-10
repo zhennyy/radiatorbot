@@ -301,10 +301,10 @@ async function loadDelivery() {
     `Для городов не из списка действует тариф по умолчанию: ${money(defaultPrice)}.`;
   const table = document.getElementById('delivery-table');
   if (!rates.length) { table.innerHTML = '<tr><td class="empty">Тарифы пока не заданы.</td></tr>'; return; }
-  table.innerHTML = '<tr><th>Город</th><th>Цена</th><th>Статус</th><th></th></tr>' +
+  table.innerHTML = '<tr><th>Город</th><th>Цена, ₽</th><th>Статус</th><th></th></tr>' +
     rates.map(r => `<tr>
       <td>${r.city}</td>
-      <td>${money(r.price)}</td>
+      <td><input type="number" min="0" value="${Math.round(r.price / 100)}" onchange="updateDeliveryPrice('${r.city.replace(/'/g, "\\'")}', this.value)"></td>
       <td><span class="status-pill ${r.active ? 'status-paid' : 'status-delivered'}">${r.active ? 'активен' : 'выключен'}</span></td>
       <td class="row-actions">
         ${r.active
@@ -312,6 +312,15 @@ async function loadDelivery() {
           : `<button onclick="toggleDelivery('${r.city}', true)">Включить</button>`}
       </td>
     </tr>`).join('');
+}
+
+async function updateDeliveryPrice(city, price) {
+  const res = await fetch('/api/delivery', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ city, price }),
+  });
+  if (!res.ok) { const err = await res.json(); alert(err.error || 'Не удалось сохранить цену.'); }
+  loadDelivery();
 }
 
 async function addDelivery() {
