@@ -94,7 +94,7 @@ const STRINGS = {
     payButton: '💳 Оплатить через ЮKassa',
     cancelButton: 'Отмена',
     checkoutCancelled: 'Оформление отменено.',
-    payLinkText: (id) => `Ссылка для оплаты заказа #${id}:`,
+    payLinkText: () => 'Ссылка для оплаты:',
     payUrlButton: 'Оплатить',
     paymentError: 'Не удалось создать платёж. Проверьте настройки ЮKassa в .env и попробуйте снова.',
 
@@ -200,7 +200,7 @@ const STRINGS = {
     payButton: '💳 Pay via ЮKassa',
     cancelButton: 'Cancel',
     checkoutCancelled: 'Checkout cancelled.',
-    payLinkText: (id) => `Payment link for order #${id}:`,
+    payLinkText: () => 'Payment link:',
     payUrlButton: 'Pay',
     paymentError: 'Could not create a payment. Check the ЮKassa settings in .env and try again.',
 
