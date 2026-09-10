@@ -242,24 +242,28 @@ async function showMyOrders(ctx) {
      WHERE oi.order_id = ?`
   );
 
-  let text = '📋 <b>Ваши заказы</b>\n\n';
+  await ctx.reply(`📋 <b>Ваши заказы</b> (последние ${orders.length})`, { parse_mode: 'HTML' });
+
   for (const o of orders) {
     const statusKey = (o.status || '').split(':')[0];
     const statusLabel = ORDER_STATUS_LABEL[statusKey] || statusKey;
     const items = itemsStmt.all(o.id);
-    const itemsText = items.map((i) => `${i.name} x${i.quantity}`).join(', ');
+    const itemsText = items.map((i) => `• ${i.name} ×${i.quantity}`).join('\n');
+    const date = (o.created_at || '').slice(0, 16).replace('T', ' ');
 
-    text += `<b>Заказ #${o.id}</b> — ${statusLabel}\n`;
-    text += `${itemsText}\n`;
+    let text = `<b>Заказ #${o.id}</b>\n`;
+    text += `${statusLabel}\n\n`;
+    text += `${itemsText}\n\n`;
     if (o.discount_percent > 0) {
-      text += `Промокод «${o.promo_code}»: -${o.discount_percent}%\n`;
+      text += `Промокод «${o.promo_code}»: −${o.discount_percent}%\n`;
     }
-    text += `Сумма: <b>${formatPrice(o.total)}</b>\n`;
-    text += `Адрес: ${o.address || '—'}\n`;
-    text += `Дата: ${o.created_at}\n\n`;
+    text += `💰 Сумма: <b>${formatPrice(o.total)}</b>\n`;
+    text += `📍 ${o.address || '—'}\n`;
+    text += `🕐 ${date}`;
+
+    await ctx.reply(text, { parse_mode: 'HTML' });
   }
 
-  await ctx.reply(text.trim(), { parse_mode: 'HTML' });
   await ctx.reply('Меню 👇', mainMenu);
 }
 
