@@ -115,6 +115,71 @@ function startWebhookServer(bot) {
     res.json({ ok: true });
   });
 
+  // === Промокоды ===
+
+  app.get('/api/promos', (req, res) => {
+    res.json(db.prepare('SELECT * FROM promo_codes ORDER BY created_at DESC').all());
+  });
+
+  app.post('/api/promos', (req, res) => {
+    const { code, discount_percent, max_uses } = req.body;
+    const percent = parseInt(discount_percent, 10);
+    if (!code || !percent || percent <= 0 || percent >= 100) {
+      return res.status(400).json({ error: 'Укажите код и процент скидки (1-99).' });
+    }
+    try {
+      db.prepare(
+        'INSERT INTO promo_codes (code, discount_percent, max_uses) VALUES (?,?,?)'
+      ).run(code.toUpperCase(), percent, max_uses ? parseInt(max_uses, 10) : null);
+      res.json({ ok: true });
+    } catch (err) {
+      if (String(err.message).includes('UNIQUE')) {
+        return res.status(409).json({ error: `Промокод "${code.toUpperCase()}" уже существует.` });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/promos/:code/active', (req, res) => {
+    const { active } = req.body;
+    db.prepare('UPDATE promo_codes SET active = ? WHERE code = ? COLLATE NOCASE').run(
+      active ? 1 : 0,
+      req.params.code
+    );
+    res.json({ ok: true });
+  });
+
+  // === Тарифы доставки ===
+
+  app.get('/api/delivery', (req, res) => {
+    res.json({
+      rates: db.prepare('SELECT * FROM delivery_rates ORDER BY city').all(),
+      defaultPrice: db.DEFAULT_DELIVERY_PRICE,
+    });
+  });
+
+  app.post('/api/delivery', (req, res) => {
+    const { city, price } = req.body;
+    const priceRub = parseFloat(price);
+    if (!city || !priceRub || priceRub < 0) {
+      return res.status(400).json({ error: 'Укажите город и цену.' });
+    }
+    db.prepare(
+      `INSERT INTO delivery_rates (city, price) VALUES (?, ?)
+       ON CONFLICT(city) DO UPDATE SET price = excluded.price, active = 1`
+    ).run(city.trim(), Math.round(priceRub * 100));
+    res.json({ ok: true });
+  });
+
+  app.put('/api/delivery/:city/active', (req, res) => {
+    const { active } = req.body;
+    db.prepare('UPDATE delivery_rates SET active = ? WHERE city = ? COLLATE NOCASE').run(
+      active ? 1 : 0,
+      req.params.city
+    );
+    res.json({ ok: true });
+  });
+
   const port = process.env.WEBHOOK_PORT || 3001;
   app.listen(port, () =>
     console.log(`Вебхук ЮKassa и веб-админка слушают порт ${port} (/admin)`)

@@ -72,6 +72,8 @@
   <div class="tabs">
     <button id="tab-btn-products" class="active" onclick="showTab('products')">Товары</button>
     <button id="tab-btn-orders" onclick="showTab('orders')">Заказы</button>
+    <button id="tab-btn-promos" onclick="showTab('promos')">Промокоды</button>
+    <button id="tab-btn-delivery" onclick="showTab('delivery')">Доставка</button>
   </div>
 
   <div id="products" class="tab-content active">
@@ -98,15 +100,54 @@
       <table id="orders-table"></table>
     </div>
   </div>
+
+  <div id="promos" class="tab-content">
+    <div class="card">
+      <h2>Добавить промокод</h2>
+      <div class="form-row">
+        <input id="pr-code" placeholder="Код (например SALE10)" style="width: 160px;">
+        <input id="pr-percent" placeholder="Скидка, %" type="number" min="1" max="99">
+        <input id="pr-max" placeholder="Лимит использований (опц.)" type="number" min="1">
+        <button class="primary" onclick="addPromo()">Добавить</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Промокоды</h2>
+      <table id="promos-table"></table>
+    </div>
+  </div>
+
+  <div id="delivery" class="tab-content">
+    <div class="card">
+      <h2>Добавить/изменить тариф</h2>
+      <div class="form-row">
+        <input id="dl-city" placeholder="Город" style="width: 200px;">
+        <input id="dl-price" placeholder="Цена, ₽" type="number" min="0">
+        <button class="primary" onclick="addDelivery()">Сохранить</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Тарифы доставки</h2>
+      <p class="empty" id="delivery-default"></p>
+      <table id="delivery-table"></table>
+    </div>
+  </div>
 </div>
 
 <script>
+const TAB_LOADERS = {
+  products: loadProducts,
+  orders: loadOrders,
+  promos: loadPromos,
+  delivery: loadDelivery,
+};
+
 function showTab(id) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.getElementById('tab-btn-' + id).classList.add('active');
-  if (id === 'products') loadProducts(); else loadOrders();
+  TAB_LOADERS[id]();
 }
 
 function money(kopecks) { return (kopecks / 100).toFixed(0) + ' ₽'; }
@@ -209,6 +250,89 @@ async function loadOrders() {
 async function setStatus(id, status) {
   await fetch(`/api/orders/${id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
   loadOrders();
+}
+
+const PROMO_LABEL = (p) => p.active ? 'активен' : 'выключен';
+
+async function loadPromos() {
+  const promos = await fetch('/api/promos').then(r => r.json());
+  const table = document.getElementById('promos-table');
+  if (!promos.length) { table.innerHTML = '<tr><td class="empty">Промокодов пока нет.</td></tr>'; return; }
+  table.innerHTML = '<tr><th>Код</th><th>Скидка</th><th>Использован</th><th>Статус</th><th></th></tr>' +
+    promos.map(p => `<tr>
+      <td>${p.code}</td>
+      <td>${p.discount_percent}%</td>
+      <td>${p.used_count}${p.max_uses ? ' / ' + p.max_uses : ' / ∞'}</td>
+      <td><span class="status-pill ${p.active ? 'status-paid' : 'status-delivered'}">${PROMO_LABEL(p)}</span></td>
+      <td class="row-actions">
+        ${p.active
+          ? `<button class="danger" onclick="togglePromo('${p.code}', false)">Выключить</button>`
+          : `<button onclick="togglePromo('${p.code}', true)">Включить</button>`}
+      </td>
+    </tr>`).join('');
+}
+
+async function addPromo() {
+  const code = document.getElementById('pr-code').value.trim();
+  const discount_percent = document.getElementById('pr-percent').value;
+  const max_uses = document.getElementById('pr-max').value;
+  if (!code || !discount_percent) return alert('Укажите код и процент скидки.');
+  const res = await fetch('/api/promos', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, discount_percent, max_uses: max_uses || null }),
+  });
+  if (!res.ok) { const err = await res.json(); return alert(err.error || 'Не удалось добавить промокод.'); }
+  document.getElementById('pr-code').value = '';
+  document.getElementById('pr-percent').value = '';
+  document.getElementById('pr-max').value = '';
+  loadPromos();
+}
+
+async function togglePromo(code, active) {
+  await fetch(`/api/promos/${encodeURIComponent(code)}/active`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }),
+  });
+  loadPromos();
+}
+
+async function loadDelivery() {
+  const { rates, defaultPrice } = await fetch('/api/delivery').then(r => r.json());
+  document.getElementById('delivery-default').textContent =
+    `Для городов не из списка действует тариф по умолчанию: ${money(defaultPrice)}.`;
+  const table = document.getElementById('delivery-table');
+  if (!rates.length) { table.innerHTML = '<tr><td class="empty">Тарифы пока не заданы.</td></tr>'; return; }
+  table.innerHTML = '<tr><th>Город</th><th>Цена</th><th>Статус</th><th></th></tr>' +
+    rates.map(r => `<tr>
+      <td>${r.city}</td>
+      <td>${money(r.price)}</td>
+      <td><span class="status-pill ${r.active ? 'status-paid' : 'status-delivered'}">${r.active ? 'активен' : 'выключен'}</span></td>
+      <td class="row-actions">
+        ${r.active
+          ? `<button class="danger" onclick="toggleDelivery('${r.city}', false)">Выключить</button>`
+          : `<button onclick="toggleDelivery('${r.city}', true)">Включить</button>`}
+      </td>
+    </tr>`).join('');
+}
+
+async function addDelivery() {
+  const city = document.getElementById('dl-city').value.trim();
+  const price = document.getElementById('dl-price').value;
+  if (!city || !price) return alert('Укажите город и цену.');
+  const res = await fetch('/api/delivery', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ city, price }),
+  });
+  if (!res.ok) { const err = await res.json(); return alert(err.error || 'Не удалось сохранить тариф.'); }
+  document.getElementById('dl-city').value = '';
+  document.getElementById('dl-price').value = '';
+  loadDelivery();
+}
+
+async function toggleDelivery(city, active) {
+  await fetch(`/api/delivery/${encodeURIComponent(city)}/active`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }),
+  });
+  loadDelivery();
 }
 
 function tickClock() {
