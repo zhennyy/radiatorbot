@@ -247,6 +247,52 @@ bot.command('addproduct', isOwner, async (ctx) => {
   ctx.reply(`Товар "${name}" добавлен.`);
 });
 
+// === Промокоды (только для владельца) ===
+
+bot.command('addpromo', isOwner, (ctx) => {
+  // формат: /addpromo КОД ПРОЦЕНТ [МАКС_ИСПОЛЬЗОВАНИЙ]
+  const parts = ctx.message.text.split(' ').filter(Boolean);
+  const [, code, percentStr, maxUsesStr] = parts;
+  const percent = parseInt(percentStr, 10);
+  if (!code || !percent || percent <= 0 || percent >= 100) {
+    return ctx.reply('Формат: /addpromo КОД ПРОЦЕНТ [МАКС_ИСПОЛЬЗОВАНИЙ]\nНапример: /addpromo SALE10 10 50');
+  }
+  const maxUses = maxUsesStr ? parseInt(maxUsesStr, 10) : null;
+  try {
+    db.prepare(
+      'INSERT INTO promo_codes (code, discount_percent, max_uses) VALUES (?,?,?)'
+    ).run(code.toUpperCase(), percent, maxUses);
+    ctx.reply(`Промокод "${code.toUpperCase()}" создан: скидка ${percent}%${maxUses ? `, лимит ${maxUses} использований` : ''}.`);
+  } catch (err) {
+    if (String(err.message).includes('UNIQUE')) {
+      ctx.reply(`Промокод "${code.toUpperCase()}" уже существует.`);
+    } else {
+      ctx.reply('Не удалось создать промокод: ' + err.message);
+    }
+  }
+});
+
+bot.command('promos', isOwner, (ctx) => {
+  const promos = db.prepare('SELECT * FROM promo_codes ORDER BY created_at DESC').all();
+  if (!promos.length) return ctx.reply('Промокодов пока нет.');
+  const text = promos
+    .map((p) => {
+      const status = p.active ? 'активен' : 'выключен';
+      const usage = p.max_uses ? `${p.used_count}/${p.max_uses}` : `${p.used_count}/∞`;
+      return `${p.code} — ${p.discount_percent}% — ${status} — использован ${usage}`;
+    })
+    .join('\n');
+  ctx.reply(text);
+});
+
+bot.command('delpromo', isOwner, (ctx) => {
+  // формат: /delpromo КОД
+  const [, code] = ctx.message.text.split(' ');
+  if (!code) return ctx.reply('Формат: /delpromo КОД');
+  const result = db.prepare('UPDATE promo_codes SET active = 0 WHERE code = ? COLLATE NOCASE').run(code);
+  ctx.reply(result.changes ? `Промокод "${code.toUpperCase()}" выключен.` : `Промокод "${code.toUpperCase()}" не найден.`);
+});
+
 bot.command('stock', isOwner, (ctx) => {
   // формат: /stock <id_товара> <новый_остаток>
   const [, id, qty] = ctx.message.text.split(' ');

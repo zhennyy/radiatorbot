@@ -37,7 +37,27 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity INTEGER NOT NULL,
   price INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,
+  discount_percent INTEGER NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  max_uses INTEGER, -- NULL = без ограничения
+  used_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 `);
+
+// миграция: добавляем колонки промокода к уже существующей таблице orders
+// (на проде в базе уже есть заказы, поэтому CREATE TABLE их не тронет)
+const orderColumns = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
+if (!orderColumns.includes('promo_code')) {
+  db.exec('ALTER TABLE orders ADD COLUMN promo_code TEXT');
+}
+if (!orderColumns.includes('discount_percent')) {
+  db.exec('ALTER TABLE orders ADD COLUMN discount_percent INTEGER NOT NULL DEFAULT 0');
+}
 
 // сидим тестовые товары, если каталог пуст
 const count = db.prepare('SELECT COUNT(*) AS c FROM products').get().c;
