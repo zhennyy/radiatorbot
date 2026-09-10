@@ -111,8 +111,8 @@ bot.hears('🔍 Поиск', (ctx) => {
   ctx.reply('Введите название товара (или часть названия) для поиска:', mainMenu);
 });
 
-bot.on('text', async (ctx) => {
-  if (!ctx.session?.awaitingSearch) return;
+bot.on('text', async (ctx, next) => {
+  if (!ctx.session?.awaitingSearch) return next();
   ctx.session.awaitingSearch = false;
   const term = ctx.message.text.trim();
   if (!term) return;
