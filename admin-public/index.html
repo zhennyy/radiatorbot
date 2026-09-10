@@ -826,7 +826,7 @@ async function loadAnalytics() {
   if (!data.topProducts.length) { table.innerHTML = `<tr><td class="empty">${a('analyticsEmpty')}</td></tr>`; return; }
   table.innerHTML = `<tr><th>${a('thProduct')}</th><th>${a('thSold')}</th><th>${a('thRevenue')}</th></tr>` +
     data.topProducts.map(p => `<tr>
-      <td>${p.name}</td>
+      <td>${(ADMIN_LANG === 'en' && p.name_en) || p.name}</td>
       <td>${p.qty}</td>
       <td>${money(p.revenue)}</td>
     </tr>`).join('');

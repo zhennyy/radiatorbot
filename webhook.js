@@ -264,7 +264,7 @@ function startWebhookServer(bot) {
 
     const topProducts = db
       .prepare(
-        `SELECT p.name AS name, SUM(oi.quantity) AS qty, SUM(oi.quantity * oi.price) AS revenue
+        `SELECT p.name AS name, p.name_en AS name_en, SUM(oi.quantity) AS qty, SUM(oi.quantity * oi.price) AS revenue
          FROM order_items oi
          JOIN orders o ON o.id = oi.order_id
          JOIN products p ON p.id = oi.product_id
