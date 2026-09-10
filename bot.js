@@ -1,6 +1,7 @@
 // bot.js
 require('dotenv').config();
 const { Telegraf, Markup, Scenes, session } = require('telegraf');
+const axios = require('axios');
 const db = require('./db');
 const { getCart } = require('./cart');
 const { checkoutScene } = require('./scenes/checkout');
@@ -23,7 +24,7 @@ function formatPrice(kopecks) {
 const mainMenu = Markup.keyboard([
   ['📦 Каталог', '🔍 Поиск'],
   ['📂 Категории', '🛒 Корзина'],
-  ['📋 Мои заказы'],
+  ['📋 Мои заказы', '🤖 AI-подбор'],
 ]).resize();
 
 function getCatalogPage(page = 0, category = null) {
@@ -131,19 +132,104 @@ bot.hears('🔍 Поиск', (ctx) => {
 });
 
 bot.on('text', async (ctx, next) => {
-  if (!ctx.session?.awaitingSearch) return next();
-  ctx.session.awaitingSearch = false;
-  const term = ctx.message.text.trim();
-  if (!term) return;
-  const products = db
-    .prepare('SELECT * FROM products WHERE name LIKE ? ORDER BY name LIMIT 20')
-    .all(`%${term}%`);
-  if (!products.length) return ctx.reply(`Ничего не найдено по запросу «${term}».`, mainMenu);
-  for (const p of products) {
-    await renderProductCard(ctx, p);
+  if (ctx.session?.awaitingSearch) {
+    ctx.session.awaitingSearch = false;
+    const term = ctx.message.text.trim();
+    if (!term) return;
+    const products = db
+      .prepare('SELECT * FROM products WHERE name LIKE ? ORDER BY name LIMIT 20')
+      .all(`%${term}%`);
+    if (!products.length) return ctx.reply(`Ничего не найдено по запросу «${term}».`, mainMenu);
+    for (const p of products) {
+      await renderProductCard(ctx, p);
+    }
+    await ctx.reply('Меню 👇', mainMenu);
+    return;
   }
-  await ctx.reply('Меню 👇', mainMenu);
+
+  if (ctx.session?.awaitingAiConsult) {
+    ctx.session.awaitingAiConsult = false;
+    const query = ctx.message.text.trim();
+    if (!query) return;
+
+    const thinkingMsg = await ctx.reply('🤖 Подбираю варианты...');
+    try {
+      const { adviceText, productIds } = await getAiRecommendation(query);
+      await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id).catch(() => {});
+      await ctx.reply(adviceText || 'Не удалось сформировать рекомендацию.');
+
+      for (const id of productIds) {
+        const p = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
+        if (p) await renderProductCard(ctx, p);
+      }
+    } catch (err) {
+      console.error('Ошибка AI-консультанта:', err.response?.data || err.message);
+      await ctx.reply('Не удалось получить рекомендацию от AI-консультанта. Попробуйте ещё раз чуть позже.');
+    }
+    await ctx.reply('Меню 👇', mainMenu);
+    return;
+  }
+
+  return next();
 });
+
+// === AI-консультант по подбору радиатора ===
+
+bot.hears('🤖 AI-подбор', (ctx) => {
+  ctx.session.awaitingAiConsult = true;
+  ctx.reply(
+    'Опишите, что вам нужно: площадь и тип помещения, тип отопления, бюджет, желаемый стиль — и я подберу подходящие товары из каталога 🤖',
+    mainMenu
+  );
+});
+
+async function getAiRecommendation(userQuery) {
+  const products = db
+    .prepare('SELECT id, name, description, price, category, stock FROM products WHERE stock > 0')
+    .all();
+
+  const catalogText = products
+    .map((p) => `#${p.id} ${p.name} (${p.category}) — ${formatPrice(p.price)}. ${p.description || ''}`)
+    .join('\n');
+
+  const systemPrompt =
+    'Ты — консультант интернет-магазина отопительного оборудования RadiatorPro. ' +
+    'Ниже дан текущий каталог товаров в наличии. Подбери покупателю 1-3 подходящих товара ' +
+    'по его описанию (площадь и тип помещения, тип отопления, бюджет, стиль и т.п.) и кратко объясни выбор. ' +
+    'Отвечай по-русски, дружелюбно и по делу, без markdown-разметки. ' +
+    'В самом конце ответа ОБЯЗАТЕЛЬНО добавь отдельной строкой формата ' +
+    '"РЕКОМЕНДАЦИИ: #id1, #id2" с ID рекомендованных товаров из каталога.\n\n' +
+    `Каталог:\n${catalogText}`;
+
+  const response = await axios.post(
+    'https://api.anthropic.com/v1/messages',
+    {
+      model: 'claude-3-5-sonnet-latest',
+      max_tokens: 600,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userQuery }],
+    },
+    {
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+    }
+  );
+
+  const raw = response.data.content?.[0]?.text || '';
+  const match = raw.match(/РЕКОМЕНДАЦИИ:\s*(.+)\s*$/i);
+  let productIds = [];
+  let adviceText = raw.trim();
+
+  if (match) {
+    productIds = [...match[1].matchAll(/(\d+)/g)].map((m) => parseInt(m[1], 10));
+    adviceText = raw.slice(0, match.index).trim();
+  }
+
+  return { adviceText, productIds };
+}
 
 // === Корзина ===
 
