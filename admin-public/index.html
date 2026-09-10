@@ -64,6 +64,48 @@
   .thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); display: block; }
   .thumb-placeholder { width: 40px; height: 40px; border-radius: 5px; border: 1px dashed var(--line); background: var(--bg); }
   td input[type="text"].photo-input { width: 160px; padding: 5px 6px; font-size: 12.5px; }
+
+  /* --- полировка --- */
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--brass); outline-offset: 1px;
+  }
+  .tabs {
+    position: sticky; top: 0; z-index: 10; background: var(--bg);
+    padding-top: 4px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { white-space: nowrap; transition: color .15s, border-color .15s; }
+  .card { transition: box-shadow .15s; }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+  table tr:hover td { background: var(--bg); }
+  tr td, tr th { transition: background .1s; }
+  button.primary { transition: opacity .15s, transform .05s; }
+  button.primary:active { transform: scale(.98); }
+  .row-actions button, button[type="button"]:not(.primary) {
+    transition: border-color .15s, color .15s;
+  }
+  #toast-stack {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: 8px; z-index: 100; pointer-events: none;
+  }
+  .toast {
+    background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 7px;
+    font-size: 13.5px; box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: var(--bad); }
+  .toast.ok { background: var(--good); }
+
+  @media (max-width: 640px) {
+    body { padding: 20px 12px 60px; }
+    .card { padding: 14px 14px; }
+    .form-row { gap: 6px; }
+    input, select, button { font-size: 13.5px; }
+    header h1 { font-size: 19px; }
+    .stat-tile { min-width: 46%; }
+  }
 </style>
 </head>
 <body>
@@ -98,7 +140,7 @@
     </div>
     <div class="card">
       <h2>Каталог</h2>
-      <table id="products-table"></table>
+      <div class="table-wrap"><table id="products-table"></table></div>
     </div>
   </div>
 
@@ -117,7 +159,7 @@
         </select>
         <input id="o-search" placeholder="Поиск: № заказа, адрес, chat ID" style="flex: 1; min-width: 200px;" oninput="debounceLoadOrders()">
       </div>
-      <table id="orders-table"></table>
+      <div class="table-wrap"><table id="orders-table"></table></div>
     </div>
   </div>
 
@@ -134,7 +176,7 @@
     </div>
     <div class="card">
       <h2>Топ товаров (по количеству продаж)</h2>
-      <table id="analytics-top-table"></table>
+      <div class="table-wrap"><table id="analytics-top-table"></table></div>
     </div>
   </div>
 
@@ -150,7 +192,7 @@
     </div>
     <div class="card">
       <h2>Промокоды</h2>
-      <table id="promos-table"></table>
+      <div class="table-wrap"><table id="promos-table"></table></div>
     </div>
   </div>
 
@@ -166,12 +208,28 @@
     <div class="card">
       <h2>Тарифы доставки</h2>
       <p class="empty" id="delivery-default"></p>
-      <table id="delivery-table"></table>
+      <div class="table-wrap"><table id="delivery-table"></table></div>
     </div>
   </div>
 </div>
 
+<div id="toast-stack"></div>
+
 <script>
+function toast(message, type) {
+  const stack = document.getElementById('toast-stack');
+  if (!stack) { alert(message); return; }
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = message;
+  stack.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+  }, 3200);
+}
+
 const TAB_LOADERS = {
   products: loadProducts,
   orders: loadOrders,
@@ -197,6 +255,8 @@ function showTab(id) {
 function money(kopecks) { return (kopecks / 100).toFixed(0) + ' ₽'; }
 
 async function loadProducts() {
+  const table0 = document.getElementById('products-table');
+  if (table0) table0.innerHTML = '<tr><td class="empty">Загрузка…</td></tr>';
   const products = await fetch('/api/products').then(r => r.json());
   const table = document.getElementById('products-table');
   if (!products.length) { table.innerHTML = '<tr><td class="empty">Каталог пуст.</td></tr>'; return; }
@@ -252,14 +312,14 @@ async function uploadProductPhoto(id, file) {
     });
     loadProducts();
   } catch (err) {
-    alert(err.message);
+    toast(err.message, 'error');
   }
 }
 
 async function addProduct() {
   const name = document.getElementById('p-name').value.trim();
   const price = parseFloat(document.getElementById('p-price').value);
-  if (!name || !price) return alert('Укажите название и цену.');
+  if (!name || !price) return toast('Укажите название и цену.', 'error');
   const body = {
     name,
     price,
@@ -317,6 +377,8 @@ async function loadOrders() {
   const params = new URLSearchParams();
   if (status) params.set('status', status);
   if (q.trim()) params.set('q', q.trim());
+  const table0 = document.getElementById('orders-table');
+  if (table0) table0.innerHTML = '<tr><td class="empty">Загрузка…</td></tr>';
   const orders = await fetch('/api/orders?' + params.toString()).then(r => r.json());
   const table = document.getElementById('orders-table');
   if (!orders.length) { table.innerHTML = '<tr><td class="empty">Ничего не найдено.</td></tr>'; return; }
@@ -346,6 +408,8 @@ async function setStatus(id, status) {
 const PROMO_LABEL = (p) => p.active ? 'активен' : 'выключен';
 
 async function loadPromos() {
+  const table0 = document.getElementById('promos-table');
+  if (table0) table0.innerHTML = '<tr><td class="empty">Загрузка…</td></tr>';
   const promos = await fetch('/api/promos').then(r => r.json());
   const table = document.getElementById('promos-table');
   if (!promos.length) { table.innerHTML = '<tr><td class="empty">Промокодов пока нет.</td></tr>'; return; }
@@ -367,12 +431,12 @@ async function addPromo() {
   const code = document.getElementById('pr-code').value.trim();
   const discount_percent = document.getElementById('pr-percent').value;
   const max_uses = document.getElementById('pr-max').value;
-  if (!code || !discount_percent) return alert('Укажите код и процент скидки.');
+  if (!code || !discount_percent) return toast('Укажите код и процент скидки.', 'error');
   const res = await fetch('/api/promos', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code, discount_percent, max_uses: max_uses || null }),
   });
-  if (!res.ok) { const err = await res.json(); return alert(err.error || 'Не удалось добавить промокод.'); }
+  if (!res.ok) { const err = await res.json(); return toast(err.error || 'Не удалось добавить промокод.', 'error'); }
   document.getElementById('pr-code').value = '';
   document.getElementById('pr-percent').value = '';
   document.getElementById('pr-max').value = '';
@@ -387,6 +451,8 @@ async function togglePromo(code, active) {
 }
 
 async function loadDelivery() {
+  const table0 = document.getElementById('delivery-table');
+  if (table0) table0.innerHTML = '<tr><td class="empty">Загрузка…</td></tr>';
   const { rates, defaultPrice } = await fetch('/api/delivery').then(r => r.json());
   document.getElementById('delivery-default').textContent =
     `Для городов не из списка действует тариф по умолчанию: ${money(defaultPrice)}.`;
@@ -410,19 +476,19 @@ async function updateDeliveryPrice(city, price) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ city, price }),
   });
-  if (!res.ok) { const err = await res.json(); alert(err.error || 'Не удалось сохранить цену.'); }
+  if (!res.ok) { const err = await res.json(); toast(err.error || 'Не удалось сохранить цену.', 'error'); }
   loadDelivery();
 }
 
 async function addDelivery() {
   const city = document.getElementById('dl-city').value.trim();
   const price = document.getElementById('dl-price').value;
-  if (!city || !price) return alert('Укажите город и цену.');
+  if (!city || !price) return toast('Укажите город и цену.', 'error');
   const res = await fetch('/api/delivery', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ city, price }),
   });
-  if (!res.ok) { const err = await res.json(); return alert(err.error || 'Не удалось сохранить тариф.'); }
+  if (!res.ok) { const err = await res.json(); return toast(err.error || 'Не удалось сохранить тариф.', 'error'); }
   document.getElementById('dl-city').value = '';
   document.getElementById('dl-price').value = '';
   loadDelivery();
@@ -436,6 +502,8 @@ async function toggleDelivery(city, active) {
 }
 
 async function loadAnalytics() {
+  const table0 = document.getElementById('analytics-top-table');
+  if (table0) table0.innerHTML = '<tr><td class="empty">Загрузка…</td></tr>';
   const data = await fetch('/api/analytics').then(r => r.json());
   document.getElementById('an-revenue-today').textContent = money(data.revenue.today);
   document.getElementById('an-revenue-week').textContent = money(data.revenue.week);
