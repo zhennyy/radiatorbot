@@ -489,8 +489,8 @@ async function loadProducts() {
     products.map(p => `<tr>
       <td>${p.photo_url ? `<img class="thumb" src="${p.photo_url}" alt="">` : `<span class="thumb-placeholder"></span>`}</td>
       <td>${p.id}</td>
-      <td>${p.name}${p.name_en ? `<div class="empty" style="margin:0;">EN: ${p.name_en}</div>` : ''}</td>
-      <td>${p.category || '—'}${p.category_en ? `<div class="empty" style="margin:0;">EN: ${p.category_en}</div>` : ''}</td>
+      <td>${ADMIN_LANG === 'en' && p.name_en ? `${p.name_en}<div class="empty" style="margin:0;">RU: ${p.name}</div>` : `${p.name}${p.name_en ? `<div class="empty" style="margin:0;">EN: ${p.name_en}</div>` : ''}`}</td>
+      <td>${ADMIN_LANG === 'en' && p.category_en ? `${p.category_en}<div class="empty" style="margin:0;">RU: ${p.category || '—'}</div>` : `${p.category || '—'}${p.category_en ? `<div class="empty" style="margin:0;">EN: ${p.category_en}</div>` : ''}`}</td>
       <td>${money(p.price)}</td>
       <td><input type="number" value="${p.stock}" onchange="updateStock(${p.id}, this.value)"></td>
       <td class="row-actions">
