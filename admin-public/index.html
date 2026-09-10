@@ -30,6 +30,10 @@
   .tab-content.active { display: block; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px; }
   .card h2 { font-size: 15px; margin: 0 0 14px; color: var(--ink-dim); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+  .stat-row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .stat-tile { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; min-width: 130px; flex: 1; }
+  .stat-num { font-size: 22px; font-weight: 700; color: var(--brass); }
+  .stat-label { font-size: 12.5px; color: var(--ink-dim); margin-top: 2px; }
   .form-row { display: flex; gap: 8px; flex-wrap: wrap; }
   input, select {
     padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; background: #fff; color: var(--ink);
@@ -74,6 +78,7 @@
     <button id="tab-btn-orders" onclick="showTab('orders')">Заказы</button>
     <button id="tab-btn-promos" onclick="showTab('promos')">Промокоды</button>
     <button id="tab-btn-delivery" onclick="showTab('delivery')">Доставка</button>
+    <button id="tab-btn-analytics" onclick="showTab('analytics')">Аналитика</button>
   </div>
 
   <div id="products" class="tab-content active">
@@ -100,7 +105,36 @@
   <div id="orders" class="tab-content">
     <div class="card">
       <h2>Заказы</h2>
+      <div class="form-row" style="margin-bottom: 14px;">
+        <select id="o-status" onchange="loadOrders()">
+          <option value="">Все статусы</option>
+          <option value="pending">Ожидает</option>
+          <option value="awaiting_payment">Ожидает оплаты</option>
+          <option value="paid">Оплачен</option>
+          <option value="shipped">Отправлен</option>
+          <option value="delivered">Доставлен</option>
+          <option value="cancelled">Отменён</option>
+        </select>
+        <input id="o-search" placeholder="Поиск: № заказа, адрес, chat ID" style="flex: 1; min-width: 200px;" oninput="debounceLoadOrders()">
+      </div>
       <table id="orders-table"></table>
+    </div>
+  </div>
+
+  <div id="analytics" class="tab-content">
+    <div class="card">
+      <h2>Выручка (оплаченные заказы)</h2>
+      <div class="stat-row">
+        <div class="stat-tile"><div class="stat-num" id="an-revenue-today">—</div><div class="stat-label">Сегодня</div></div>
+        <div class="stat-tile"><div class="stat-num" id="an-revenue-week">—</div><div class="stat-label">7 дней</div></div>
+        <div class="stat-tile"><div class="stat-num" id="an-revenue-month">—</div><div class="stat-label">30 дней</div></div>
+        <div class="stat-tile"><div class="stat-num" id="an-avg">—</div><div class="stat-label">Средний чек</div></div>
+      </div>
+      <p class="empty" id="an-orders-count"></p>
+    </div>
+    <div class="card">
+      <h2>Топ товаров (по количеству продаж)</h2>
+      <table id="analytics-top-table"></table>
     </div>
   </div>
 
@@ -143,7 +177,14 @@ const TAB_LOADERS = {
   orders: loadOrders,
   promos: loadPromos,
   delivery: loadDelivery,
+  analytics: loadAnalytics,
 };
+
+let ordersSearchTimer = null;
+function debounceLoadOrders() {
+  clearTimeout(ordersSearchTimer);
+  ordersSearchTimer = setTimeout(loadOrders, 300);
+}
 
 function showTab(id) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -271,9 +312,14 @@ const STATUS_LABEL = {
 };
 
 async function loadOrders() {
-  const orders = await fetch('/api/orders').then(r => r.json());
+  const status = document.getElementById('o-status')?.value || '';
+  const q = document.getElementById('o-search')?.value || '';
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (q.trim()) params.set('q', q.trim());
+  const orders = await fetch('/api/orders?' + params.toString()).then(r => r.json());
   const table = document.getElementById('orders-table');
-  if (!orders.length) { table.innerHTML = '<tr><td class="empty">Заказов нет.</td></tr>'; return; }
+  if (!orders.length) { table.innerHTML = '<tr><td class="empty">Ничего не найдено.</td></tr>'; return; }
   table.innerHTML = '<tr><th>ID</th><th>Статус</th><th>Сумма</th><th>Состав</th><th>Адрес</th><th></th></tr>' +
     orders.map(o => {
       const st = (o.status || '').split(':')[0];
@@ -387,6 +433,25 @@ async function toggleDelivery(city, active) {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }),
   });
   loadDelivery();
+}
+
+async function loadAnalytics() {
+  const data = await fetch('/api/analytics').then(r => r.json());
+  document.getElementById('an-revenue-today').textContent = money(data.revenue.today);
+  document.getElementById('an-revenue-week').textContent = money(data.revenue.week);
+  document.getElementById('an-revenue-month').textContent = money(data.revenue.month);
+  document.getElementById('an-avg').textContent = data.totalOrders ? money(data.avgOrderValue) : '—';
+  document.getElementById('an-orders-count').textContent =
+    `Заказов: сегодня ${data.ordersCount.today}, за 7 дней ${data.ordersCount.week}, за 30 дней ${data.ordersCount.month} (учитываются только оплаченные/отправленные/доставленные).`;
+
+  const table = document.getElementById('analytics-top-table');
+  if (!data.topProducts.length) { table.innerHTML = '<tr><td class="empty">Оплаченных заказов пока нет.</td></tr>'; return; }
+  table.innerHTML = '<tr><th>Товар</th><th>Продано, шт</th><th>Выручка</th></tr>' +
+    data.topProducts.map(p => `<tr>
+      <td>${p.name}</td>
+      <td>${p.qty}</td>
+      <td>${money(p.revenue)}</td>
+    </tr>`).join('');
 }
 
 function tickClock() {

@@ -123,7 +123,23 @@ function startWebhookServer(bot) {
   });
 
   app.get('/api/orders', (req, res) => {
-    const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 100').all();
+    const { status, q } = req.query;
+    let orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 300').all();
+
+    if (status) {
+      orders = orders.filter((o) => (o.status || '').split(':')[0] === status);
+    }
+    if (q && q.trim()) {
+      const needle = q.trim().toLowerCase();
+      orders = orders.filter(
+        (o) =>
+          String(o.id).includes(needle) ||
+          String(o.chat_id).includes(needle) ||
+          (o.address || '').toLowerCase().includes(needle)
+      );
+    }
+    orders = orders.slice(0, 100);
+
     const items = db
       .prepare(
         `SELECT oi.order_id, oi.quantity, p.name FROM order_items oi
@@ -135,6 +151,58 @@ function startWebhookServer(bot) {
       items: items.filter((i) => i.order_id === o.id),
     }));
     res.json(withItems);
+  });
+
+  // заказы, которые реально принесли деньги (не pending/ожидание оплаты/отменённые)
+  const PAID_STATUSES = ['paid', 'shipped', 'delivered'];
+
+  app.get('/api/analytics', (req, res) => {
+    const placeholders = PAID_STATUSES.map(() => '?').join(',');
+    const paidOrders = db
+      .prepare(`SELECT * FROM orders WHERE status IN (${placeholders})`)
+      .all(...PAID_STATUSES);
+
+    // created_at хранится как "YYYY-MM-DD HH:MM:SS" (UTC, SQLite CURRENT_TIMESTAMP) —
+    // приводим к формату, который надёжно парсит Date()
+    const toDate = (s) => new Date(String(s).replace(' ', 'T') + 'Z');
+
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfDay.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const startOfMonth = new Date(startOfDay.getTime() - 29 * 24 * 60 * 60 * 1000);
+
+    const since = (date) => paidOrders.filter((o) => toDate(o.created_at) >= date);
+
+    const revenue = (list) => list.reduce((sum, o) => sum + o.total, 0);
+
+    const ordersToday = since(startOfDay);
+    const ordersWeek = since(startOfWeek);
+    const ordersMonth = since(startOfMonth);
+
+    const avgOrderValue = paidOrders.length
+      ? Math.round(revenue(paidOrders) / paidOrders.length)
+      : 0;
+
+    const topProducts = db
+      .prepare(
+        `SELECT p.name AS name, SUM(oi.quantity) AS qty, SUM(oi.quantity * oi.price) AS revenue
+         FROM order_items oi
+         JOIN orders o ON o.id = oi.order_id
+         JOIN products p ON p.id = oi.product_id
+         WHERE o.status IN (${placeholders})
+         GROUP BY oi.product_id
+         ORDER BY qty DESC
+         LIMIT 5`
+      )
+      .all(...PAID_STATUSES);
+
+    res.json({
+      revenue: { today: revenue(ordersToday), week: revenue(ordersWeek), month: revenue(ordersMonth) },
+      ordersCount: { today: ordersToday.length, week: ordersWeek.length, month: ordersMonth.length },
+      avgOrderValue,
+      totalOrders: paidOrders.length,
+      topProducts,
+    });
   });
 
   app.post('/api/orders/:id/status', async (req, res) => {
