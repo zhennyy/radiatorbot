@@ -276,15 +276,30 @@ bot.action('checkout_start', async (ctx) => {
 
 // === Админ-панель (только для владельца) ===
 
-bot.command('orders', isOwner, (ctx) => {
+bot.command('orders', isOwner, async (ctx) => {
   const orders = db
     .prepare("SELECT * FROM orders WHERE status != 'pending' ORDER BY created_at DESC LIMIT 20")
     .all();
   if (!orders.length) return ctx.reply('Заказов нет.');
-  const text = orders
-    .map((o) => `#${o.id} — ${o.status} — ${(o.total / 100).toFixed(0)} ₽ — ${o.created_at}`)
-    .join('\n');
-  ctx.reply(text);
+
+  await ctx.reply(`📋 <b>Заказы</b> (последние ${orders.length})`, { parse_mode: 'HTML' });
+
+  for (const o of orders) {
+    const statusKey = (o.status || '').split(':')[0];
+    const statusLabel = ORDER_STATUS_LABEL[statusKey] || statusKey;
+    const date = (o.created_at || '').slice(0, 16).replace('T', ' ');
+
+    let text = `<b>Заказ #${o.id}</b>\n`;
+    text += `${statusLabel}\n\n`;
+    if (o.discount_percent > 0) {
+      text += `Промокод «${o.promo_code}»: −${o.discount_percent}%\n`;
+    }
+    text += `💰 Сумма: <b>${formatPrice(o.total)}</b>\n`;
+    text += `📍 ${o.address || '—'}\n`;
+    text += `🕐 ${date}`;
+
+    await ctx.reply(text, { parse_mode: 'HTML' });
+  }
 });
 
 bot.command('addproduct', isOwner, async (ctx) => {
