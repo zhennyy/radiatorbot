@@ -218,6 +218,7 @@ async function getAiRecommendation(userQuery) {
     }
   );
 
+  console.log('AI-консультант, полный response.data:', JSON.stringify(response.data));
   const raw = response.data.content?.[0]?.text || '';
   console.log('AI-консультант, сырой ответ:', raw);
 
