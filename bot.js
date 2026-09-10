@@ -45,7 +45,14 @@ function getCatalogPage(page = 0, category = null) {
 
 bot.start((ctx) => {
   const lang = db.getLang(ctx.chat.id);
-  ctx.reply(t(lang, 'welcome'), buildMainMenu(lang));
+  const name = db.getName(ctx.chat.id);
+  if (!name) {
+    ctx.session.awaitingName = true;
+    ctx.reply(t(lang, 'welcome'));
+    ctx.reply(t(lang, 'askName'));
+    return;
+  }
+  ctx.reply(t(lang, 'welcomeBack', name), buildMainMenu(lang));
 });
 
 // === Переключение языка / Language switch ===
@@ -167,6 +174,19 @@ bot.hears([t('ru', 'btnSearch'), t('en', 'btnSearch')], (ctx) => {
 
 bot.on('text', async (ctx, next) => {
   const lang = db.getLang(ctx.chat.id);
+
+  if (ctx.session?.awaitingName) {
+    ctx.session.awaitingName = false;
+    const name = ctx.message.text.trim().slice(0, 64);
+    if (!name) {
+      ctx.session.awaitingName = true;
+      return ctx.reply(t(lang, 'askName'));
+    }
+    db.setName(ctx.chat.id, name);
+    await ctx.reply(t(lang, 'nameSaved', name));
+    await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
+    return;
+  }
 
   if (ctx.session?.awaitingSearch) {
     ctx.session.awaitingSearch = false;
@@ -575,7 +595,8 @@ bot.command('markshipped', isOwner, (ctx) => {
   const order = db.prepare('SELECT chat_id FROM orders WHERE id = ?').get(parseInt(orderId));
   if (order) {
     const buyerLang = db.getLang(order.chat_id);
-    bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', orderId));
+    const buyerName = db.getName(order.chat_id);
+    bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', buyerName, orderId));
   }
   ctx.reply(`Заказ #${orderId} помечен как отправленный.`);
 });

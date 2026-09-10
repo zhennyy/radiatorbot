@@ -60,12 +60,20 @@ CREATE TABLE IF NOT EXISTS delivery_rates (
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
--- язык интерфейса покупателя (ru/en) — выбирается кнопкой "🌐 Язык / Language"
+-- язык интерфейса покупателя (ru/en) — выбирается кнопкой "🌐 Язык / Language";
+-- name — имя покупателя, один раз спрашиваем при первом /start
 CREATE TABLE IF NOT EXISTS user_settings (
   chat_id INTEGER PRIMARY KEY,
-  lang TEXT NOT NULL DEFAULT 'ru'
+  lang TEXT NOT NULL DEFAULT 'ru',
+  name TEXT
 );
 `);
+
+// миграция: имя покупателя (могло отсутствовать в базе, созданной до этой функции)
+const userSettingsColumns = db.prepare('PRAGMA table_info(user_settings)').all().map((c) => c.name);
+if (!userSettingsColumns.includes('name')) {
+  db.exec('ALTER TABLE user_settings ADD COLUMN name TEXT');
+}
 
 // получить язык покупателя (по умолчанию — русский)
 function getLang(chatId) {
@@ -79,6 +87,20 @@ function setLang(chatId, lang) {
     `INSERT INTO user_settings (chat_id, lang) VALUES (?, ?)
      ON CONFLICT(chat_id) DO UPDATE SET lang = excluded.lang`
   ).run(chatId, lang);
+}
+
+// получить сохранённое имя покупателя (null, если ещё не указано)
+function getName(chatId) {
+  const row = db.prepare('SELECT name FROM user_settings WHERE chat_id = ?').get(chatId);
+  return row ? row.name : null;
+}
+
+// сохранить имя покупателя
+function setName(chatId, name) {
+  db.prepare(
+    `INSERT INTO user_settings (chat_id, name) VALUES (?, ?)
+     ON CONFLICT(chat_id) DO UPDATE SET name = excluded.name`
+  ).run(chatId, name);
 }
 
 // найти английское название города доставки по русскому (для истории заказов —
@@ -266,5 +288,7 @@ module.exports = db;
 module.exports.DEFAULT_DELIVERY_PRICE = 150000; // 1500 ₽
 module.exports.getLang = getLang;
 module.exports.setLang = setLang;
+module.exports.getName = getName;
+module.exports.setName = setName;
 module.exports.getCityEn = getCityEn;
 module.exports.translateCity = translateCity;

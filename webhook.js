@@ -59,7 +59,8 @@ function startWebhookServer(bot) {
       db.prepare('DELETE FROM cart_items WHERE chat_id = ?').run(order.chat_id);
 
       const buyerLang = db.getLang(order.chat_id);
-      await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'paymentReceived', orderId));
+      const buyerName = db.getName(order.chat_id);
+      await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'paymentReceived', buyerName, orderId));
 
       if (process.env.OWNER_CHAT_ID) {
         const itemsText = orderItems
@@ -291,7 +292,8 @@ function startWebhookServer(bot) {
       const order = db.prepare('SELECT chat_id FROM orders WHERE id = ?').get(req.params.id);
       if (order) {
         const buyerLang = db.getLang(order.chat_id);
-        await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', req.params.id));
+        const buyerName = db.getName(order.chat_id);
+        await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', buyerName, req.params.id));
       }
     }
     res.json({ ok: true });

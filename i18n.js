@@ -85,6 +85,7 @@ const STRINGS = {
 
     summaryAddress: (address) => `Адрес: ${address}`,
     summaryOrderHeader: 'Заказ:',
+    summaryGreeting: (name) => `${name}, спасибо за заказ!`,
     itemsSum: (sum) => `\nСумма товаров: ${sum}`,
     deliveryFree: 'бесплатно',
     deliverySummary: (city, cost) => `\nДоставка${city ? ` (${city})` : ' (самовывоз)'}: ${cost}`,
@@ -98,12 +99,17 @@ const STRINGS = {
     paymentError: 'Не удалось создать платёж. Проверьте настройки ЮKassa в .env и попробуйте снова.',
 
     // === уведомления оплаты / доставки (payment & shipping notifications) ===
-    paymentReceived: (id) => `Оплата получена! Заказ #${id} принят в работу. ✅`,
-    orderShipped: (id) => `Ваш заказ #${id} отправлен! 🚚`,
+    paymentReceived: (name, id) => `${name ? name + ', ' : ''}оплата получена! Заказ #${id} принят в работу. ✅`,
+    orderShipped: (name, id) => `${name ? name + ', ' : ''}ваш заказ #${id} отправлен! 🚚`,
 
     // === выбор языка / language switch ===
     chooseLanguage: 'Выберите язык интерфейса:',
     languageSet: 'Язык переключён на русский ✅',
+
+    // === имя покупателя / buyer name ===
+    askName: 'Как вас зовут? Буду обращаться к вам по имени 🙂',
+    nameSaved: (name) => `Приятно познакомиться, ${name}! 👋`,
+    welcomeBack: (name) => `С возвращением, ${name}! 🔥\nВыберите раздел:`,
   },
 
   en: {
@@ -185,6 +191,7 @@ const STRINGS = {
 
     summaryAddress: (address) => `Address: ${address}`,
     summaryOrderHeader: 'Order:',
+    summaryGreeting: (name) => `${name}, thank you for your order!`,
     itemsSum: (sum) => `\nItems total: ${sum}`,
     deliveryFree: 'free',
     deliverySummary: (city, cost) => `\nDelivery${city ? ` (${city})` : ' (pickup)'}: ${cost}`,
@@ -198,12 +205,17 @@ const STRINGS = {
     paymentError: 'Could not create a payment. Check the ЮKassa settings in .env and try again.',
 
     // === payment & shipping notifications ===
-    paymentReceived: (id) => `Payment received! Order #${id} is now being processed. ✅`,
-    orderShipped: (id) => `Your order #${id} has shipped! 🚚`,
+    paymentReceived: (name, id) => `${name ? name + ', y' : 'Y'}our payment has been received! Order #${id} is now being processed. ✅`,
+    orderShipped: (name, id) => `${name ? name + ', y' : 'Y'}our order #${id} has shipped! 🚚`,
 
     // === language switch ===
     chooseLanguage: 'Choose your interface language:',
     languageSet: 'Language switched to English ✅',
+
+    // === buyer name ===
+    askName: "What's your name? I'll use it to address you 🙂",
+    nameSaved: (name) => `Nice to meet you, ${name}! 👋`,
+    welcomeBack: (name) => `Welcome back, ${name}! 🔥\nChoose a section:`,
   },
 };
 
