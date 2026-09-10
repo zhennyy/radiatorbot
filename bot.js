@@ -204,7 +204,7 @@ async function getAiRecommendation(userQuery) {
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
-      model: 'claude-3-5-sonnet-latest',
+      model: 'claude-sonnet-5',
       max_tokens: 600,
       system: systemPrompt,
       messages: [{ role: 'user', content: userQuery }],
