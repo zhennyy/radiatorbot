@@ -23,6 +23,7 @@ function formatPrice(kopecks) {
 const mainMenu = Markup.keyboard([
   ['📦 Каталог', '🔍 Поиск'],
   ['📂 Категории', '🛒 Корзина'],
+  ['📋 Мои заказы'],
 ]).resize();
 
 function getCatalogPage(page = 0, category = null) {
@@ -213,6 +214,54 @@ bot.action(/rm_(\d+)/, (ctx) => {
   ctx.answerCbQuery('Удалено');
   showCart(ctx);
 });
+
+// === История заказов покупателя ===
+
+const ORDER_STATUS_LABEL = {
+  pending: '⏳ ожидает оплаты',
+  awaiting_payment: '⏳ ожидает оплаты',
+  paid: '✅ оплачен',
+  shipped: '🚚 отправлен',
+  delivered: '📦 доставлен',
+  cancelled: '❌ отменён',
+};
+
+bot.hears('📋 Мои заказы', showMyOrders);
+bot.command('myorders', showMyOrders);
+
+async function showMyOrders(ctx) {
+  const orders = db
+    .prepare('SELECT * FROM orders WHERE chat_id = ? ORDER BY created_at DESC LIMIT 10')
+    .all(ctx.chat.id);
+
+  if (!orders.length) return ctx.reply('У вас пока нет заказов.', mainMenu);
+
+  const itemsStmt = db.prepare(
+    `SELECT oi.quantity, p.name FROM order_items oi
+     JOIN products p ON p.id = oi.product_id
+     WHERE oi.order_id = ?`
+  );
+
+  let text = '📋 <b>Ваши заказы</b>\n\n';
+  for (const o of orders) {
+    const statusKey = (o.status || '').split(':')[0];
+    const statusLabel = ORDER_STATUS_LABEL[statusKey] || statusKey;
+    const items = itemsStmt.all(o.id);
+    const itemsText = items.map((i) => `${i.name} x${i.quantity}`).join(', ');
+
+    text += `<b>Заказ #${o.id}</b> — ${statusLabel}\n`;
+    text += `${itemsText}\n`;
+    if (o.discount_percent > 0) {
+      text += `Промокод «${o.promo_code}»: -${o.discount_percent}%\n`;
+    }
+    text += `Сумма: <b>${formatPrice(o.total)}</b>\n`;
+    text += `Адрес: ${o.address || '—'}\n`;
+    text += `Дата: ${o.created_at}\n\n`;
+  }
+
+  await ctx.reply(text.trim(), { parse_mode: 'HTML' });
+  await ctx.reply('Меню 👇', mainMenu);
+}
 
 // === Оформление заказа ===
 
