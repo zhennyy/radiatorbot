@@ -205,7 +205,7 @@ async function getAiRecommendation(userQuery) {
     'https://api.anthropic.com/v1/messages',
     {
       model: 'claude-sonnet-5',
-      max_tokens: 600,
+      max_tokens: 1500,
       system: systemPrompt,
       messages: [{ role: 'user', content: userQuery }],
     },
@@ -219,7 +219,10 @@ async function getAiRecommendation(userQuery) {
   );
 
   console.log('AI-консультант, полный response.data:', JSON.stringify(response.data));
-  const raw = response.data.content?.[0]?.text || '';
+  // ответ модели может содержать служебный блок "thinking" перед текстом —
+  // берём именно блок с type === 'text', а не первый элемент массива
+  const textBlock = response.data.content?.find((b) => b.type === 'text');
+  const raw = textBlock?.text || '';
   console.log('AI-консультант, сырой ответ:', raw);
 
   // ищем строку с рекомендациями в любом месте текста (не только в самом конце)
