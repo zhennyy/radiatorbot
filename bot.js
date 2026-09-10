@@ -219,13 +219,22 @@ async function getAiRecommendation(userQuery) {
   );
 
   const raw = response.data.content?.[0]?.text || '';
-  const match = raw.match(/РЕКОМЕНДАЦИИ:\s*(.+)\s*$/i);
+  console.log('AI-консультант, сырой ответ:', raw);
+
+  // ищем строку с рекомендациями в любом месте текста (не только в самом конце)
+  const match = raw.match(/РЕКОМЕНДАЦИИ:\s*([^\n]*)/i);
   let productIds = [];
   let adviceText = raw.trim();
 
   if (match) {
     productIds = [...match[1].matchAll(/(\d+)/g)].map((m) => parseInt(m[1], 10));
     adviceText = raw.slice(0, match.index).trim();
+  }
+
+  if (!adviceText) {
+    adviceText = productIds.length
+      ? 'Вот что подходит по вашему запросу:'
+      : 'Не получилось подобрать точный вариант — уточните запрос (площадь, тип отопления, бюджет).';
   }
 
   return { adviceText, productIds };
