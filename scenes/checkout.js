@@ -229,8 +229,9 @@ checkoutScene.action('pay_yookassa', async (ctx) => {
       `awaiting_payment:${payment.id}`,
       orderId
     );
+    const orderCode = db.prepare('SELECT order_code FROM orders WHERE id = ?').get(orderId)?.order_code;
     await ctx.reply(
-      t(lang, 'payLinkText', orderId),
+      t(lang, 'payLinkText', orderCode || orderId),
       Markup.inlineKeyboard([
         Markup.button.url(t(lang, 'payUrlButton'), payment.confirmation.confirmation_url),
       ])
