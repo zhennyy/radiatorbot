@@ -55,7 +55,27 @@ CREATE TABLE IF NOT EXISTS delivery_rates (
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+-- язык интерфейса покупателя (ru/en) — выбирается кнопкой "🌐 Язык / Language"
+CREATE TABLE IF NOT EXISTS user_settings (
+  chat_id INTEGER PRIMARY KEY,
+  lang TEXT NOT NULL DEFAULT 'ru'
+);
 `);
+
+// получить язык покупателя (по умолчанию — русский)
+function getLang(chatId) {
+  const row = db.prepare('SELECT lang FROM user_settings WHERE chat_id = ?').get(chatId);
+  return row ? row.lang : 'ru';
+}
+
+// сохранить выбор языка покупателя
+function setLang(chatId, lang) {
+  db.prepare(
+    `INSERT INTO user_settings (chat_id, lang) VALUES (?, ?)
+     ON CONFLICT(chat_id) DO UPDATE SET lang = excluded.lang`
+  ).run(chatId, lang);
+}
 
 // миграция: добавляем колонки промокода к уже существующей таблице orders
 // (на проде в базе уже есть заказы, поэтому CREATE TABLE их не тронет)
@@ -138,3 +158,5 @@ if (count === 0) {
 
 module.exports = db;
 module.exports.DEFAULT_DELIVERY_PRICE = 150000; // 1500 ₽
+module.exports.getLang = getLang;
+module.exports.setLang = setLang;

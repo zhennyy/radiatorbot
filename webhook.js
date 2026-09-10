@@ -6,6 +6,7 @@ const multer = require('multer');
 const basicAuth = require('express-basic-auth');
 const db = require('./db');
 const { checkLowStock } = require('./notify');
+const { t } = require('./i18n');
 
 // фото товаров храним рядом с базой — на Railway это подключённый Volume,
 // так что файлы переживают редеплой (в отличие от остальной файловой системы)
@@ -57,10 +58,8 @@ function startWebhookServer(bot) {
       checkLowStock(bot);
       db.prepare('DELETE FROM cart_items WHERE chat_id = ?').run(order.chat_id);
 
-      await bot.telegram.sendMessage(
-        order.chat_id,
-        `Оплата получена! Заказ #${orderId} принят в работу. ✅`
-      );
+      const buyerLang = db.getLang(order.chat_id);
+      await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'paymentReceived', orderId));
 
       if (process.env.OWNER_CHAT_ID) {
         const itemsText = orderItems
@@ -267,7 +266,8 @@ function startWebhookServer(bot) {
     if (status === 'shipped') {
       const order = db.prepare('SELECT chat_id FROM orders WHERE id = ?').get(req.params.id);
       if (order) {
-        await bot.telegram.sendMessage(order.chat_id, `Ваш заказ #${req.params.id} отправлен! 🚚`);
+        const buyerLang = db.getLang(order.chat_id);
+        await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', req.params.id));
       }
     }
     res.json({ ok: true });

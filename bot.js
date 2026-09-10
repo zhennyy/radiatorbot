@@ -7,6 +7,7 @@ const { getCart } = require('./cart');
 const { checkoutScene } = require('./scenes/checkout');
 const isOwner = require('./middleware/isOwner');
 const { checkLowStock } = require('./notify');
+const { t } = require('./i18n');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const PAGE_SIZE = 5;
@@ -20,12 +21,17 @@ function formatPrice(kopecks) {
 }
 
 // Постоянная клавиатура снизу — переприсылаем её после каждого раздела,
-// чтобы она не пропадала, даже если Telegram-клиент её случайно скрыл
-const mainMenu = Markup.keyboard([
-  ['📦 Каталог', '🔍 Поиск'],
-  ['📂 Категории', '🛒 Корзина'],
-  ['📋 Мои заказы', '🤖 AI-подбор'],
-]).resize();
+// чтобы она не пропадала, даже если Telegram-клиент её случайно скрыл.
+// Покупатель может переключить язык интерфейса кнопкой "🌐 Язык / Language" —
+// эта кнопка и её обработчики распознают нажатие независимо от текущего языка.
+function buildMainMenu(lang) {
+  return Markup.keyboard([
+    [t(lang, 'btnCatalog'), t(lang, 'btnSearch')],
+    [t(lang, 'btnCategories'), t(lang, 'btnCart')],
+    [t(lang, 'btnMyOrders'), t(lang, 'btnAiPick')],
+    [t(lang, 'btnLanguage')],
+  ]).resize();
+}
 
 function getCatalogPage(page = 0, category = null) {
   const where = category ? 'WHERE category = ?' : '';
@@ -38,10 +44,30 @@ function getCatalogPage(page = 0, category = null) {
 }
 
 bot.start((ctx) => {
-  ctx.reply('Добро пожаловать в магазин RadiatorPro 🔥\nВыберите раздел:', mainMenu);
+  const lang = db.getLang(ctx.chat.id);
+  ctx.reply(t(lang, 'welcome'), buildMainMenu(lang));
 });
 
-bot.hears('📦 Каталог', (ctx) => sendCatalogPage(ctx, 0));
+// === Переключение языка / Language switch ===
+
+bot.hears([t('ru', 'btnLanguage'), t('en', 'btnLanguage')], async (ctx) => {
+  const lang = db.getLang(ctx.chat.id);
+  await ctx.reply(
+    t(lang, 'chooseLanguage'),
+    Markup.inlineKeyboard([
+      [Markup.button.callback('🇷🇺 Русский', 'lang_ru'), Markup.button.callback('🇬🇧 English', 'lang_en')],
+    ])
+  );
+});
+
+bot.action(/^lang_(ru|en)$/, async (ctx) => {
+  const lang = ctx.match[1];
+  db.setLang(ctx.chat.id, lang);
+  await ctx.answerCbQuery();
+  await ctx.reply(t(lang, 'languageSet'), buildMainMenu(lang));
+});
+
+bot.hears([t('ru', 'btnCatalog'), t('en', 'btnCatalog')], (ctx) => sendCatalogPage(ctx, 0));
 bot.command('catalog', (ctx) => sendCatalogPage(ctx, 0));
 
 function escapeHtml(s) {
@@ -51,20 +77,19 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
-async function renderProductCard(ctx, p) {
-  const stockLine =
-    p.stock > 0 ? `📦 В наличии: ${p.stock} шт.` : '⛔️ Нет в наличии';
+async function renderProductCard(ctx, p, lang) {
+  const stockLine = p.stock > 0 ? t(lang, 'inStock', p.stock) : t(lang, 'outOfStock');
 
   const caption =
     `🔥 <b>${escapeHtml(p.name)}</b>\n` +
     (p.description ? `<i>${escapeHtml(p.description)}</i>\n\n` : '\n') +
     `🏷 ${escapeHtml(p.category)}\n` +
-    `💰 Цена: <b>${formatPrice(p.price)}</b>\n` +
+    `${t(lang, 'priceLabel')} <b>${formatPrice(p.price)}</b>\n` +
     stockLine;
 
   const extra = {
     parse_mode: 'HTML',
-    ...Markup.inlineKeyboard([Markup.button.callback('➕ В корзину', `add_${p.id}`)]),
+    ...Markup.inlineKeyboard([Markup.button.callback(t(lang, 'addToCart'), `add_${p.id}`)]),
   };
 
   if (p.photo_url) {
@@ -77,11 +102,12 @@ async function renderProductCard(ctx, p) {
 }
 
 async function sendCatalogPage(ctx, page, category = null) {
+  const lang = db.getLang(ctx.chat.id);
   const { products, hasNext, hasPrev } = getCatalogPage(page, category);
-  if (!products.length) return ctx.reply('Товаров не найдено.', mainMenu);
+  if (!products.length) return ctx.reply(t(lang, 'noProducts'), buildMainMenu(lang));
 
   for (const p of products) {
-    await renderProductCard(ctx, p);
+    await renderProductCard(ctx, p, lang);
   }
 
   const catIndex = category && ctx.session?.catList ? ctx.session.catList.indexOf(category) : -1;
@@ -90,9 +116,9 @@ async function sendCatalogPage(ctx, page, category = null) {
   const navButtons = [];
   if (hasPrev) navButtons.push(Markup.button.callback('⬅️', `page_${page - 1}${catSuffix}`));
   if (hasNext) navButtons.push(Markup.button.callback('➡️', `page_${page + 1}${catSuffix}`));
-  if (navButtons.length) await ctx.reply('Листать:', Markup.inlineKeyboard(navButtons));
+  if (navButtons.length) await ctx.reply(t(lang, 'pageNav'), Markup.inlineKeyboard(navButtons));
 
-  await ctx.reply('Меню 👇', mainMenu);
+  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
 }
 
 bot.action(/^page_(\d+)(?:_c(\d+))?$/, (ctx) => {
@@ -103,35 +129,40 @@ bot.action(/^page_(\d+)(?:_c(\d+))?$/, (ctx) => {
   sendCatalogPage(ctx, page, category);
 });
 
-// === Категории ===
+// === Категории / Categories ===
 
-bot.hears('📂 Категории', async (ctx) => {
+bot.hears([t('ru', 'btnCategories'), t('en', 'btnCategories')], async (ctx) => {
+  const lang = db.getLang(ctx.chat.id);
   const categories = db
     .prepare('SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category')
     .all()
     .map((r) => r.category);
-  if (!categories.length) return ctx.reply('Категории пока не заданы.', mainMenu);
+  if (!categories.length) return ctx.reply(t(lang, 'noCategories'), buildMainMenu(lang));
   ctx.session.catList = categories;
   const buttons = categories.map((c, i) => [Markup.button.callback(c, `cat_${i}`)]);
-  await ctx.reply('Выберите категорию:', Markup.inlineKeyboard(buttons));
-  await ctx.reply('Меню 👇', mainMenu);
+  await ctx.reply(t(lang, 'categoriesPrompt'), Markup.inlineKeyboard(buttons));
+  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
 });
 
 bot.action(/^cat_(\d+)$/, (ctx) => {
+  const lang = db.getLang(ctx.chat.id);
   ctx.answerCbQuery();
   const category = ctx.session?.catList?.[parseInt(ctx.match[1], 10)];
-  if (!category) return ctx.reply('Список категорий устарел, откройте его заново: 📂 Категории');
+  if (!category) return ctx.reply(t(lang, 'categoriesStale'));
   sendCatalogPage(ctx, 0, category);
 });
 
-// === Поиск по названию ===
+// === Поиск по названию / Search ===
 
-bot.hears('🔍 Поиск', (ctx) => {
+bot.hears([t('ru', 'btnSearch'), t('en', 'btnSearch')], (ctx) => {
+  const lang = db.getLang(ctx.chat.id);
   ctx.session.awaitingSearch = true;
-  ctx.reply('Введите название товара (или часть названия) для поиска:', mainMenu);
+  ctx.reply(t(lang, 'searchPrompt'), buildMainMenu(lang));
 });
 
 bot.on('text', async (ctx, next) => {
+  const lang = db.getLang(ctx.chat.id);
+
   if (ctx.session?.awaitingSearch) {
     ctx.session.awaitingSearch = false;
     const term = ctx.message.text.trim();
@@ -139,11 +170,11 @@ bot.on('text', async (ctx, next) => {
     const products = db
       .prepare('SELECT * FROM products WHERE name LIKE ? ORDER BY name LIMIT 20')
       .all(`%${term}%`);
-    if (!products.length) return ctx.reply(`Ничего не найдено по запросу «${term}».`, mainMenu);
+    if (!products.length) return ctx.reply(t(lang, 'searchNoResults', term), buildMainMenu(lang));
     for (const p of products) {
-      await renderProductCard(ctx, p);
+      await renderProductCard(ctx, p, lang);
     }
-    await ctx.reply('Меню 👇', mainMenu);
+    await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
     return;
   }
 
@@ -152,38 +183,36 @@ bot.on('text', async (ctx, next) => {
     const query = ctx.message.text.trim();
     if (!query) return;
 
-    const thinkingMsg = await ctx.reply('🤖 Подбираю варианты...');
+    const thinkingMsg = await ctx.reply(t(lang, 'aiThinking'));
     try {
-      const { adviceText, productIds } = await getAiRecommendation(query);
+      const { adviceText, productIds } = await getAiRecommendation(query, lang);
       await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id).catch(() => {});
-      await ctx.reply(adviceText || 'Не удалось сформировать рекомендацию.');
+      await ctx.reply(adviceText || t(lang, 'aiNoRecommendation'));
 
       for (const id of productIds) {
         const p = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
-        if (p) await renderProductCard(ctx, p);
+        if (p) await renderProductCard(ctx, p, lang);
       }
     } catch (err) {
       console.error('Ошибка AI-консультанта:', err.response?.data || err.message);
-      await ctx.reply('Не удалось получить рекомендацию от AI-консультанта. Попробуйте ещё раз чуть позже.');
+      await ctx.reply(t(lang, 'aiError'));
     }
-    await ctx.reply('Меню 👇', mainMenu);
+    await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
     return;
   }
 
   return next();
 });
 
-// === AI-консультант по подбору радиатора ===
+// === AI-консультант по подбору радиатора / AI product-pick consultant ===
 
-bot.hears('🤖 AI-подбор', (ctx) => {
+bot.hears([t('ru', 'btnAiPick'), t('en', 'btnAiPick')], (ctx) => {
+  const lang = db.getLang(ctx.chat.id);
   ctx.session.awaitingAiConsult = true;
-  ctx.reply(
-    'Опишите, что вам нужно: площадь и тип помещения, тип отопления, бюджет, желаемый стиль — и я подберу подходящие товары из каталога 🤖',
-    mainMenu
-  );
+  ctx.reply(t(lang, 'aiPickPrompt'), buildMainMenu(lang));
 });
 
-async function getAiRecommendation(userQuery) {
+async function getAiRecommendation(userQuery, lang) {
   const products = db
     .prepare('SELECT id, name, description, price, category, stock FROM products WHERE stock > 0')
     .all();
@@ -192,11 +221,14 @@ async function getAiRecommendation(userQuery) {
     .map((p) => `#${p.id} ${p.name} (${p.category}) — ${formatPrice(p.price)}. ${p.description || ''}`)
     .join('\n');
 
+  const replyLanguageInstruction =
+    lang === 'en' ? 'Answer in English, friendly and to the point, no markdown formatting.' : 'Отвечай по-русски, дружелюбно и по делу, без markdown-разметки.';
+
   const systemPrompt =
     'Ты — консультант интернет-магазина отопительного оборудования RadiatorPro. ' +
     'Ниже дан текущий каталог товаров в наличии. Подбери покупателю 1-3 подходящих товара ' +
     'по его описанию (площадь и тип помещения, тип отопления, бюджет, стиль и т.п.) и кратко объясни выбор. ' +
-    'Отвечай по-русски, дружелюбно и по делу, без markdown-разметки. ' +
+    `${replyLanguageInstruction} ` +
     'В самом конце ответа ОБЯЗАТЕЛЬНО добавь отдельной строкой формата ' +
     '"РЕКОМЕНДАЦИИ: #id1, #id2" с ID рекомендованных товаров из каталога.\n\n' +
     `Каталог:\n${catalogText}`;
@@ -236,17 +268,16 @@ async function getAiRecommendation(userQuery) {
   }
 
   if (!adviceText) {
-    adviceText = productIds.length
-      ? 'Вот что подходит по вашему запросу:'
-      : 'Не получилось подобрать точный вариант — уточните запрос (площадь, тип отопления, бюджет).';
+    adviceText = productIds.length ? t(lang, 'aiHere') : t(lang, 'aiNoMatch');
   }
 
   return { adviceText, productIds };
 }
 
-// === Корзина ===
+// === Корзина / Cart ===
 
 bot.action(/add_(\d+)/, (ctx) => {
+  const lang = db.getLang(ctx.chat.id);
   const productId = parseInt(ctx.match[1], 10);
   const chatId = ctx.chat.id;
 
@@ -263,18 +294,19 @@ bot.action(/add_(\d+)/, (ctx) => {
       'INSERT INTO cart_items (chat_id, product_id, quantity) VALUES (?,?,1)'
     ).run(chatId, productId);
   }
-  ctx.answerCbQuery('Добавлено в корзину ✅');
+  ctx.answerCbQuery(t(lang, 'addedToCart'));
 });
 
-bot.hears('🛒 Корзина', showCart);
+bot.hears([t('ru', 'btnCart'), t('en', 'btnCart')], showCart);
 bot.command('cart', showCart);
 
 async function showCart(ctx) {
+  const lang = db.getLang(ctx.chat.id);
   const chatId = ctx.chat.id;
   const { items, total } = getCart(chatId);
-  if (!items.length) return ctx.reply('Корзина пуста.', mainMenu);
+  if (!items.length) return ctx.reply(t(lang, 'cartEmpty'), buildMainMenu(lang));
 
-  let text = 'Ваша корзина:\n\n';
+  let text = t(lang, 'cartTitle');
   const buttons = [];
   for (const i of items) {
     text += `${i.name} x${i.quantity} — ${formatPrice(i.price * i.quantity)}\n`;
@@ -283,11 +315,11 @@ async function showCart(ctx) {
       Markup.button.callback(`❌`, `rm_${i.product_id}`),
     ]);
   }
-  text += `\nИтого: ${formatPrice(total)}`;
-  buttons.push([Markup.button.callback('✅ Оформить заказ', 'checkout_start')]);
+  text += t(lang, 'cartTotal', formatPrice(total));
+  buttons.push([Markup.button.callback(t(lang, 'checkoutButton'), 'checkout_start')]);
 
   await ctx.reply(text, Markup.inlineKeyboard(buttons));
-  await ctx.reply('Меню 👇', mainMenu);
+  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
 }
 
 bot.action(/dec_(\d+)/, (ctx) => {
@@ -305,16 +337,74 @@ bot.action(/dec_(\d+)/, (ctx) => {
 });
 
 bot.action(/rm_(\d+)/, (ctx) => {
+  const lang = db.getLang(ctx.chat.id);
   const productId = parseInt(ctx.match[1], 10);
   db.prepare('DELETE FROM cart_items WHERE chat_id = ? AND product_id = ?').run(
     ctx.chat.id,
     productId
   );
-  ctx.answerCbQuery('Удалено');
+  ctx.answerCbQuery(t(lang, 'removed'));
   showCart(ctx);
 });
 
-// === История заказов покупателя ===
+// === История заказов покупателя / Buyer's order history ===
+
+bot.hears([t('ru', 'btnMyOrders'), t('en', 'btnMyOrders')], showMyOrders);
+bot.command('myorders', showMyOrders);
+
+async function showMyOrders(ctx) {
+  const lang = db.getLang(ctx.chat.id);
+  const orders = db
+    .prepare('SELECT * FROM orders WHERE chat_id = ? ORDER BY created_at DESC LIMIT 10')
+    .all(ctx.chat.id);
+
+  if (!orders.length) return ctx.reply(t(lang, 'ordersEmpty'), buildMainMenu(lang));
+
+  const itemsStmt = db.prepare(
+    `SELECT oi.quantity, p.name FROM order_items oi
+     JOIN products p ON p.id = oi.product_id
+     WHERE oi.order_id = ?`
+  );
+
+  await ctx.reply(t(lang, 'ordersTitle', orders.length), { parse_mode: 'HTML' });
+
+  for (const o of orders) {
+    const statusKey = (o.status || '').split(':')[0];
+    const statusLabel = t(lang, 'orderStatus')[statusKey] || statusKey;
+    const items = itemsStmt.all(o.id);
+    const itemsText = items.map((i) => `• ${i.name} ×${i.quantity}`).join('\n');
+    const date = (o.created_at || '').slice(0, 16).replace('T', ' ');
+
+    let text = `<b>${t(lang, 'orderNumber', o.id)}</b>\n`;
+    text += `${statusLabel}\n\n`;
+    text += `${itemsText}\n\n`;
+    if (o.discount_percent > 0) {
+      text += `${t(lang, 'promoLine', o.promo_code, o.discount_percent)}\n`;
+    }
+    if (o.delivery_cost > 0) {
+      text += `${t(lang, 'deliveryLine', o.delivery_city, formatPrice(o.delivery_cost))}\n`;
+    } else if (o.delivery_city === null && (o.address === 'Самовывоз' || o.address === 'Pickup')) {
+      text += `${t(lang, 'pickupLine')}\n`;
+    }
+    text += `${t(lang, 'sumLabel')} <b>${formatPrice(o.total)}</b>\n`;
+    text += `${t(lang, 'addressLabel')} ${o.address || '—'}\n`;
+    text += `🕐 ${date}`;
+
+    await ctx.reply(text, { parse_mode: 'HTML' });
+  }
+
+  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
+}
+
+// === Оформление заказа / Checkout ===
+
+bot.action('checkout_start', async (ctx) => {
+  await ctx.answerCbQuery();
+  await ctx.scene.enter('checkout-wizard');
+});
+
+// === Админ-панель (только для владельца, тексты на русском — это внутренний инструмент) ===
+// === Owner admin commands (Russian only — internal tooling for the shop owner) ===
 
 const ORDER_STATUS_LABEL = {
   pending: '⏳ ожидает оплаты',
@@ -324,61 +414,6 @@ const ORDER_STATUS_LABEL = {
   delivered: '📦 доставлен',
   cancelled: '❌ отменён',
 };
-
-bot.hears('📋 Мои заказы', showMyOrders);
-bot.command('myorders', showMyOrders);
-
-async function showMyOrders(ctx) {
-  const orders = db
-    .prepare('SELECT * FROM orders WHERE chat_id = ? ORDER BY created_at DESC LIMIT 10')
-    .all(ctx.chat.id);
-
-  if (!orders.length) return ctx.reply('У вас пока нет заказов.', mainMenu);
-
-  const itemsStmt = db.prepare(
-    `SELECT oi.quantity, p.name FROM order_items oi
-     JOIN products p ON p.id = oi.product_id
-     WHERE oi.order_id = ?`
-  );
-
-  await ctx.reply(`📋 <b>Ваши заказы</b> (последние ${orders.length})`, { parse_mode: 'HTML' });
-
-  for (const o of orders) {
-    const statusKey = (o.status || '').split(':')[0];
-    const statusLabel = ORDER_STATUS_LABEL[statusKey] || statusKey;
-    const items = itemsStmt.all(o.id);
-    const itemsText = items.map((i) => `• ${i.name} ×${i.quantity}`).join('\n');
-    const date = (o.created_at || '').slice(0, 16).replace('T', ' ');
-
-    let text = `<b>Заказ #${o.id}</b>\n`;
-    text += `${statusLabel}\n\n`;
-    text += `${itemsText}\n\n`;
-    if (o.discount_percent > 0) {
-      text += `Промокод «${o.promo_code}»: −${o.discount_percent}%\n`;
-    }
-    if (o.delivery_cost > 0) {
-      text += `🚚 Доставка${o.delivery_city ? ` (${o.delivery_city})` : ''}: ${formatPrice(o.delivery_cost)}\n`;
-    } else if (o.delivery_city === null && o.address === 'Самовывоз') {
-      text += `🚚 Самовывоз\n`;
-    }
-    text += `💰 Сумма: <b>${formatPrice(o.total)}</b>\n`;
-    text += `📍 ${o.address || '—'}\n`;
-    text += `🕐 ${date}`;
-
-    await ctx.reply(text, { parse_mode: 'HTML' });
-  }
-
-  await ctx.reply('Меню 👇', mainMenu);
-}
-
-// === Оформление заказа ===
-
-bot.action('checkout_start', async (ctx) => {
-  await ctx.answerCbQuery();
-  await ctx.scene.enter('checkout-wizard');
-});
-
-// === Админ-панель (только для владельца) ===
 
 bot.command('orders', isOwner, async (ctx) => {
   const orders = db
@@ -400,7 +435,7 @@ bot.command('orders', isOwner, async (ctx) => {
     }
     if (o.delivery_cost > 0) {
       text += `🚚 Доставка${o.delivery_city ? ` (${o.delivery_city})` : ''}: ${formatPrice(o.delivery_cost)}\n`;
-    } else if (o.delivery_city === null && o.address === 'Самовывоз') {
+    } else if (o.delivery_city === null && (o.address === 'Самовывоз' || o.address === 'Pickup')) {
       text += `🚚 Самовывоз\n`;
     }
     text += `💰 Сумма: <b>${formatPrice(o.total)}</b>\n`;
@@ -529,7 +564,10 @@ bot.command('markshipped', isOwner, (ctx) => {
   if (!orderId) return ctx.reply('Формат: /markshipped <id_заказа>');
   db.prepare("UPDATE orders SET status = 'shipped' WHERE id = ?").run(parseInt(orderId));
   const order = db.prepare('SELECT chat_id FROM orders WHERE id = ?').get(parseInt(orderId));
-  if (order) bot.telegram.sendMessage(order.chat_id, `Ваш заказ #${orderId} отправлен! 🚚`);
+  if (order) {
+    const buyerLang = db.getLang(order.chat_id);
+    bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', orderId));
+  }
   ctx.reply(`Заказ #${orderId} помечен как отправленный.`);
 });
 
