@@ -122,8 +122,8 @@ function startWebhookServer(bot) {
     });
   });
 
-  app.get('/api/orders', (req, res) => {
-    const { status, q } = req.query;
+  // общий фильтр заказов по статусу и поисковой строке — используется и списком, и CSV-экспортом
+  function filterOrders(status, q, limit) {
     let orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 300').all();
 
     if (status) {
@@ -138,20 +138,76 @@ function startWebhookServer(bot) {
           (o.address || '').toLowerCase().includes(needle)
       );
     }
-    orders = orders.slice(0, 100);
+    if (limit) orders = orders.slice(0, limit);
 
     const items = db
       .prepare(
-        `SELECT oi.order_id, oi.quantity, p.name FROM order_items oi
+        `SELECT oi.order_id, oi.quantity, oi.price, p.name FROM order_items oi
          JOIN products p ON p.id = oi.product_id`
       )
       .all();
-    const withItems = orders.map((o) => ({
+    return orders.map((o) => ({
       ...o,
       items: items.filter((i) => i.order_id === o.id),
     }));
-    res.json(withItems);
+  }
+
+  app.get('/api/orders', (req, res) => {
+    const { status, q } = req.query;
+    res.json(filterOrders(status, q, 100));
   });
+
+  // экспорт отфильтрованного списка заказов в CSV (с BOM для корректной кириллицы в Excel)
+  app.get('/api/orders/export', (req, res) => {
+    const { status, q } = req.query;
+    const orders = filterOrders(status, q, null);
+
+    const csvCell = (val) => {
+      const s = val === null || val === undefined ? '' : String(val);
+      return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const header = [
+      'ID', 'Дата', 'Статус', 'Товары', 'Сумма', 'Доставка (город)', 'Стоимость доставки',
+      'Адрес', 'Промокод', 'Скидка %', 'Способ оплаты', 'Chat ID',
+    ];
+    const rows = orders.map((o) => [
+      o.id,
+      o.created_at,
+      STATUS_LABEL_RU[(o.status || '').split(':')[0]] || o.status,
+      o.items.map((i) => `${i.name} x${i.quantity}`).join('; '),
+      (o.total / 100).toFixed(2),
+      o.delivery_city || '',
+      o.delivery_cost ? (o.delivery_cost / 100).toFixed(2) : '',
+      o.address || '',
+      o.promo_code || '',
+      o.discount_percent || '',
+      o.payment_provider || '',
+      o.chat_id,
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="orders-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send('\uFEFF' + csv);
+  });
+
+  // полная карточка одного заказа — состав, доставка, промокод, способ оплаты
+  app.get('/api/orders/:id', (req, res) => {
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Заказ не найден.' });
+    const items = db
+      .prepare(
+        `SELECT oi.quantity, oi.price, p.name, p.photo_url FROM order_items oi
+         JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`
+      )
+      .all(order.id);
+    res.json({ ...order, items });
+  });
+
+  const STATUS_LABEL_RU = {
+    pending: 'ожидает', awaiting_payment: 'ожидает оплаты', paid: 'оплачен',
+    shipped: 'отправлен', delivered: 'доставлен', cancelled: 'отменён',
+  };
 
   // заказы, которые реально принесли деньги (не pending/ожидание оплаты/отменённые)
   const PAID_STATUSES = ['paid', 'shipped', 'delivered'];
