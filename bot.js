@@ -43,12 +43,17 @@ async function sendCatalogPage(ctx, page) {
   if (!products.length) return ctx.reply('Каталог пуст.');
 
   for (const p of products) {
-    await ctx.reply(
-      `${p.name}\n${p.description || ''}\nКатегория: ${p.category}\nЦена: ${formatPrice(p.price)}\nВ наличии: ${p.stock} шт.`,
-      Markup.inlineKeyboard([
-        Markup.button.callback('➕ В корзину', `add_${p.id}`),
-      ])
-    );
+    const caption = `${p.name}\n${p.description || ''}\nКатегория: ${p.category}\nЦена: ${formatPrice(p.price)}\nВ наличии: ${p.stock} шт.`;
+    const keyboard = Markup.inlineKeyboard([
+      Markup.button.callback('➕ В корзину', `add_${p.id}`),
+    ]);
+    if (p.photo_url) {
+      await ctx.replyWithPhoto(p.photo_url, { caption, ...keyboard }).catch(() =>
+        ctx.reply(caption, keyboard)
+      );
+    } else {
+      await ctx.reply(caption, keyboard);
+    }
   }
 
   const navButtons = [];

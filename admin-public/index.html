@@ -57,6 +57,9 @@
   .status-shipped { background: #e4edf6; color: #2f5c8a; }
   .status-delivered { background: #e9e9e9; color: #555; }
   .empty { color: var(--ink-dim); font-size: 13.5px; padding: 12px 0; }
+  .thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; border: 1px solid var(--line); background: var(--bg); display: block; }
+  .thumb-placeholder { width: 40px; height: 40px; border-radius: 5px; border: 1px dashed var(--line); background: var(--bg); }
+  td input[type="text"].photo-input { width: 160px; padding: 5px 6px; font-size: 12.5px; }
 </style>
 </head>
 <body>
@@ -79,6 +82,7 @@
         <input id="p-price" placeholder="Цена, ₽" type="number">
         <input id="p-stock" placeholder="Остаток" type="number">
         <input id="p-category" placeholder="Категория">
+        <input id="p-photo" placeholder="Ссылка на фото (URL)" style="flex: 1; min-width: 200px;">
         <button class="primary" onclick="addProduct()">Добавить</button>
       </div>
     </div>
@@ -111,14 +115,18 @@ async function loadProducts() {
   const products = await fetch('/api/products').then(r => r.json());
   const table = document.getElementById('products-table');
   if (!products.length) { table.innerHTML = '<tr><td class="empty">Каталог пуст.</td></tr>'; return; }
-  table.innerHTML = '<tr><th>ID</th><th>Название</th><th>Категория</th><th>Цена</th><th>Остаток</th><th></th></tr>' +
+  table.innerHTML = '<tr><th>Фото</th><th>ID</th><th>Название</th><th>Категория</th><th>Цена</th><th>Остаток</th><th></th></tr>' +
     products.map(p => `<tr>
+      <td>${p.photo_url ? `<img class="thumb" src="${p.photo_url}" alt="">` : `<span class="thumb-placeholder"></span>`}</td>
       <td>${p.id}</td>
       <td>${p.name}</td>
       <td>${p.category || '—'}</td>
       <td>${money(p.price)}</td>
       <td><input type="number" value="${p.stock}" onchange="updateStock(${p.id}, this.value)"></td>
-      <td class="row-actions"><button class="danger" onclick="deleteProduct(${p.id})">Удалить</button></td>
+      <td class="row-actions">
+        <button onclick="editPhoto(${p.id}, '${(p.photo_url || '').replace(/'/g, "\\'")}')">Фото</button>
+        <button class="danger" onclick="deleteProduct(${p.id})">Удалить</button>
+      </td>
     </tr>`).join('');
 }
 
@@ -131,12 +139,14 @@ async function addProduct() {
     price,
     stock: parseInt(document.getElementById('p-stock').value) || 0,
     category: document.getElementById('p-category').value.trim(),
+    photo_url: document.getElementById('p-photo').value.trim(),
   };
   await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   document.getElementById('p-name').value = '';
   document.getElementById('p-price').value = '';
   document.getElementById('p-stock').value = '';
   document.getElementById('p-category').value = '';
+  document.getElementById('p-photo').value = '';
   loadProducts();
 }
 
@@ -147,6 +157,19 @@ async function updateStock(id, stock) {
   await fetch(`/api/products/${id}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...p, price: p.price / 100, stock: parseInt(stock) }),
+  });
+  loadProducts();
+}
+
+async function editPhoto(id, currentUrl) {
+  const url = prompt('Ссылка на фото товара:', currentUrl || '');
+  if (url === null) return;
+  const products = await fetch('/api/products').then(r => r.json());
+  const p = products.find(p => p.id === id);
+  if (!p) return;
+  await fetch(`/api/products/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...p, price: p.price / 100, photo_url: url.trim() }),
   });
   loadProducts();
 }
