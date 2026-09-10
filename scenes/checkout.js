@@ -12,13 +12,22 @@ function getDeliveryPrice(city) {
   return rate ? rate.price : db.DEFAULT_DELIVERY_PRICE;
 }
 
-function isPickup(text) {
-  return /^самовывоз/i.test((text || '').trim());
+function buildCityKeyboard(cityOptions) {
+  const cityButtons = cityOptions.map((opt, i) =>
+    Markup.button.callback(opt.city, `deliv_city_${i}`)
+  );
+  const rows = [];
+  for (let i = 0; i < cityButtons.length; i += 2) {
+    rows.push(cityButtons.slice(i, i + 2));
+  }
+  rows.push([Markup.button.callback('📍 Другой город', 'deliv_other')]);
+  rows.push([Markup.button.callback('🏠 Самовывоз', 'deliv_pickup')]);
+  return Markup.inlineKeyboard(rows);
 }
 
 const checkoutScene = new Scenes.WizardScene(
   'checkout-wizard',
-  // Шаг 1: проверяем корзину и остатки, спрашиваем город доставки
+  // Шаг 1: проверяем корзину и остатки, показываем кнопки выбора города
   async (ctx) => {
     const { items } = getCart(ctx.chat.id);
     if (!items.length) {
@@ -34,49 +43,47 @@ const checkoutScene = new Scenes.WizardScene(
       }
     }
 
-    await ctx.reply('Введите город доставки (или напишите «самовывоз»):');
+    const cityOptions = db
+      .prepare('SELECT city, price FROM delivery_rates WHERE active = 1 ORDER BY city')
+      .all();
+    ctx.wizard.state.cityOptions = cityOptions;
+
+    await ctx.reply('Выберите город доставки:', buildCityKeyboard(cityOptions));
     return ctx.wizard.next();
   },
-  // Шаг 2: город/самовывоз -> считаем стоимость доставки
+  // Шаг 2: ждём нажатия кнопки выбора города (обрабатывается action-хендлерами ниже)
   async (ctx) => {
-    const text = (ctx.message.text || '').trim();
-
-    if (isPickup(text)) {
-      ctx.wizard.state.address = 'Самовывоз';
-      ctx.wizard.state.deliveryCity = null;
-      ctx.wizard.state.deliveryCost = 0;
-      ctx.wizard.selectStep(3);
-      return checkoutScene.steps[3](ctx);
+    if (ctx.message) {
+      await ctx.reply('Пожалуйста, выберите вариант на кнопках выше 👆');
     }
-
+  },
+  // Шаг 3: город/название города введено вручную -> адрес
+  async (ctx) => {
+    const text = (ctx.message?.text || '').trim();
     if (!text) {
-      await ctx.reply('Введите город доставки (или напишите «самовывоз»):');
+      await ctx.reply('Введите текст сообщением.');
       return;
     }
 
-    ctx.wizard.state.deliveryCity = text;
-    ctx.wizard.state.deliveryCost = getDeliveryPrice(text);
-    await ctx.reply('Введите точный адрес (улица, дом, квартира):');
-    return ctx.wizard.next();
-  },
-  // Шаг 3: точный адрес доставки
-  async (ctx) => {
-    const street = (ctx.message.text || '').trim();
-    if (!street) {
+    if (ctx.wizard.state.awaitingCustomCityName) {
+      ctx.wizard.state.awaitingCustomCityName = false;
+      ctx.wizard.state.deliveryCity = text;
+      ctx.wizard.state.deliveryCost = getDeliveryPrice(text);
       await ctx.reply('Введите точный адрес (улица, дом, квартира):');
       return;
     }
-    ctx.wizard.state.address = `${ctx.wizard.state.deliveryCity}, ${street}`;
+
+    ctx.wizard.state.address = `${ctx.wizard.state.deliveryCity}, ${text}`;
     ctx.wizard.selectStep(3);
     return checkoutScene.steps[3](ctx);
   },
   // Шаг 4: применяем промокод (если есть) и показываем итог с доставкой
   async (ctx) => {
     // этот шаг вызывается либо напрямую (после ввода адреса/самовывоза),
-    // либо как следующий шаг визарда после ввода промокода — различаем по наличию текста-промокода
+    // либо как следующий шаг визарда после ввода промокода — различаем по флагу
     if (ctx.wizard.state.awaitingPromo) {
       ctx.wizard.state.awaitingPromo = false;
-      const input = (ctx.message.text || '').trim();
+      const input = (ctx.message?.text || '').trim();
       const { total } = getCart(ctx.chat.id);
 
       let discountPercent = 0;
@@ -135,6 +142,39 @@ const checkoutScene = new Scenes.WizardScene(
   // Шаг 5: ждём нажатия кнопки оплаты (обрабатывается глобальным action ниже)
   async (ctx) => {}
 );
+
+// выбор города из списка кнопок
+checkoutScene.action(/^deliv_city_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const idx = parseInt(ctx.match[1], 10);
+  const opt = ctx.wizard.state.cityOptions?.[idx];
+  if (!opt) {
+    await ctx.reply('Список городов устарел, начните оформление заново: 🛒 Корзина → ✅ Оформить заказ');
+    return ctx.scene.leave();
+  }
+  ctx.wizard.state.deliveryCity = opt.city;
+  ctx.wizard.state.deliveryCost = opt.price;
+  await ctx.reply(`Город: ${opt.city}\nВведите точный адрес (улица, дом, квартира):`);
+  ctx.wizard.selectStep(2);
+});
+
+// свой вариант города, не из списка
+checkoutScene.action('deliv_other', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.wizard.state.awaitingCustomCityName = true;
+  await ctx.reply('Введите название города:');
+  ctx.wizard.selectStep(2);
+});
+
+// самовывоз — доставка не нужна, сразу к промокоду и итогу
+checkoutScene.action('deliv_pickup', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.wizard.state.address = 'Самовывоз';
+  ctx.wizard.state.deliveryCity = null;
+  ctx.wizard.state.deliveryCost = 0;
+  ctx.wizard.selectStep(3);
+  return checkoutScene.steps[3](ctx);
+});
 
 checkoutScene.action('checkout_cancel', async (ctx) => {
   await ctx.answerCbQuery();
