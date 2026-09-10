@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RadiatorPro — админка</title>
+<style>
+  :root {
+    --bg: #f4f2ee; --surface: #ffffff; --ink: #1c1a17; --ink-dim: #706a5f;
+    --line: #e2ddd3; --brass: #a9762a; --brass-bg: #f7ecd9;
+    --good: #2f7d4f; --bad: #b0392c; --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink); margin: 0; padding: 32px 20px 60px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 8px; }
+  header h1 { font-size: 22px; margin: 0; }
+  header h1 span { color: var(--brass); }
+  header .sub { color: var(--ink-dim); font-size: 13px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    border: none; background: none; padding: 10px 4px; margin-right: 18px; font-size: 14.5px;
+    color: var(--ink-dim); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 600;
+  }
+  .tabs button.active { color: var(--ink); border-color: var(--brass); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 20px; }
+  .card h2 { font-size: 15px; margin: 0 0 14px; color: var(--ink-dim); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+  .form-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  input, select {
+    padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; background: #fff; color: var(--ink);
+  }
+  input[type="number"] { width: 100px; }
+  #p-name { flex: 1; min-width: 160px; }
+  #p-category { width: 140px; }
+  button.primary {
+    background: var(--brass); color: #fff; border: none; border-radius: 6px; padding: 9px 16px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button.primary:hover { opacity: .9; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--ink-dim); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+  td input[type="number"] { width: 70px; padding: 5px 6px; }
+  .row-actions button { border: 1px solid var(--line); background: #fff; border-radius: 5px; padding: 5px 9px; font-size: 12.5px; cursor: pointer; margin-right: 4px; }
+  .row-actions button:hover { border-color: var(--brass); color: var(--brass); }
+  .row-actions button.danger:hover { border-color: var(--bad); color: var(--bad); }
+  .status-pill {
+    display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+  .status-pending { background: #f2e9d8; color: #8a6a1e; }
+  .status-paid, .status-awaiting_payment { background: #e6f0e9; color: var(--good); }
+  .status-shipped { background: #e4edf6; color: #2f5c8a; }
+  .status-delivered { background: #e9e9e9; color: #555; }
+  .empty { color: var(--ink-dim); font-size: 13.5px; padding: 12px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Radiator<span>Pro</span> — админка</h1>
+    <span class="sub" id="clock"></span>
+  </header>
+
+  <div class="tabs">
+    <button id="tab-btn-products" class="active" onclick="showTab('products')">Товары</button>
+    <button id="tab-btn-orders" onclick="showTab('orders')">Заказы</button>
+  </div>
+
+  <div id="products" class="tab-content active">
+    <div class="card">
+      <h2>Добавить товар</h2>
+      <div class="form-row">
+        <input id="p-name" placeholder="Название">
+        <input id="p-price" placeholder="Цена, ₽" type="number">
+        <input id="p-stock" placeholder="Остаток" type="number">
+        <input id="p-category" placeholder="Категория">
+        <button class="primary" onclick="addProduct()">Добавить</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Каталог</h2>
+      <table id="products-table"></table>
+    </div>
+  </div>
+
+  <div id="orders" class="tab-content">
+    <div class="card">
+      <h2>Заказы</h2>
+      <table id="orders-table"></table>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('tab-btn-' + id).classList.add('active');
+  if (id === 'products') loadProducts(); else loadOrders();
+}
+
+function money(kopecks) { return (kopecks / 100).toFixed(0) + ' ₽'; }
+
+async function loadProducts() {
+  const products = await fetch('/api/products').then(r => r.json());
+  const table = document.getElementById('products-table');
+  if (!products.length) { table.innerHTML = '<tr><td class="empty">Каталог пуст.</td></tr>'; return; }
+  table.innerHTML = '<tr><th>ID</th><th>Название</th><th>Категория</th><th>Цена</th><th>Остаток</th><th></th></tr>' +
+    products.map(p => `<tr>
+      <td>${p.id}</td>
+      <td>${p.name}</td>
+      <td>${p.category || '—'}</td>
+      <td>${money(p.price)}</td>
+      <td><input type="number" value="${p.stock}" onchange="updateStock(${p.id}, this.value)"></td>
+      <td class="row-actions"><button class="danger" onclick="deleteProduct(${p.id})">Удалить</button></td>
+    </tr>`).join('');
+}
+
+async function addProduct() {
+  const name = document.getElementById('p-name').value.trim();
+  const price = parseFloat(document.getElementById('p-price').value);
+  if (!name || !price) return alert('Укажите название и цену.');
+  const body = {
+    name,
+    price,
+    stock: parseInt(document.getElementById('p-stock').value) || 0,
+    category: document.getElementById('p-category').value.trim(),
+  };
+  await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  document.getElementById('p-name').value = '';
+  document.getElementById('p-price').value = '';
+  document.getElementById('p-stock').value = '';
+  document.getElementById('p-category').value = '';
+  loadProducts();
+}
+
+async function updateStock(id, stock) {
+  const products = await fetch('/api/products').then(r => r.json());
+  const p = products.find(p => p.id === id);
+  if (!p) return;
+  await fetch(`/api/products/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...p, price: p.price / 100, stock: parseInt(stock) }),
+  });
+  loadProducts();
+}
+
+async function deleteProduct(id) {
+  if (!confirm('Удалить товар #' + id + '?')) return;
+  await fetch(`/api/products/${id}`, { method: 'DELETE' });
+  loadProducts();
+}
+
+const STATUS_LABEL = {
+  pending: 'ожидает', paid: 'оплачен', shipped: 'отправлен', delivered: 'доставлен', cancelled: 'отменён',
+};
+
+async function loadOrders() {
+  const orders = await fetch('/api/orders').then(r => r.json());
+  const table = document.getElementById('orders-table');
+  if (!orders.length) { table.innerHTML = '<tr><td class="empty">Заказов нет.</td></tr>'; return; }
+  table.innerHTML = '<tr><th>ID</th><th>Статус</th><th>Сумма</th><th>Состав</th><th>Адрес</th><th></th></tr>' +
+    orders.map(o => {
+      const st = (o.status || '').split(':')[0];
+      const label = STATUS_LABEL[st] || st;
+      return `<tr>
+        <td>#${o.id}</td>
+        <td><span class="status-pill status-${st}">${label}</span></td>
+        <td>${money(o.total)}</td>
+        <td>${o.items.map(i => `${i.name} ×${i.quantity}`).join(', ')}</td>
+        <td>${o.address || '—'}</td>
+        <td class="row-actions">
+          <button onclick="setStatus(${o.id}, 'shipped')">Отправлен</button>
+          <button onclick="setStatus(${o.id}, 'delivered')">Доставлен</button>
+        </td>
+      </tr>`;
+    }).join('');
+}
+
+async function setStatus(id, status) {
+  await fetch(`/api/orders/${id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+  loadOrders();
+}
+
+function tickClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleString('ru-RU');
+}
+tickClock();
+setInterval(tickClock, 30000);
+
+loadProducts();
+</script>
+</body>
+</html>
