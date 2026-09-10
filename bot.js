@@ -30,7 +30,7 @@ function getCatalogPage(page = 0, category = null) {
 
 bot.start((ctx) => {
   ctx.reply(
-    'Добро пожаловать в магазин радиаторов «Тепло» 🔥\nВыберите раздел:',
+    'Добро пожаловать в магазин RadiatorPro 🔥\nВыберите раздел:',
     Markup.keyboard(['📦 Каталог', '🛒 Корзина']).resize()
   );
 });
