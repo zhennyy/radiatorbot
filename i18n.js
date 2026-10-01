@@ -29,6 +29,7 @@ const STRINGS = {
     cartShort: (n) => `🛒 Корзина · ${n}`,
     noMoreStock: 'Больше нет в наличии',
     openShopText: 'Весь каталог — в нашей витрине 👇',
+    menuUpdated: 'Обновили меню ✨ Нажмите «📦 Каталог» ещё раз — откроется витрина',
     openShopBtn: '🛍 Открыть витрину',
     pageNav: 'Листать:',
 
@@ -141,6 +142,7 @@ const STRINGS = {
     cartShort: (n) => `🛒 Cart · ${n}`,
     noMoreStock: 'No more in stock',
     openShopText: 'The whole catalog is in our shop 👇',
+    menuUpdated: 'Menu updated ✨ Tap «📦 Catalog» again to open the shop',
     openShopBtn: '🛍 Open the shop',
     pageNav: 'Browse:',
 

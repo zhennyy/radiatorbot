@@ -36,7 +36,7 @@ function buildMainMenu(lang) {
     [catalogBtn, t(lang, 'btnSearch'), t(lang, 'btnCart')],
     [t(lang, 'btnCategories'), t(lang, 'btnMyOrders'), t(lang, 'btnAiPick')],
     [t(lang, 'btnLanguage')],
-  ]).resize();
+  ]).resize().persistent();
 }
 
 bot.start((ctx) => {
@@ -74,8 +74,8 @@ bot.hears([t('ru', 'btnCatalog'), t('en', 'btnCatalog')], async (ctx) => {
   if (!SHOP_URL) return sendCarousel(ctx, -1, 0);
   // старая клавиатура без витрины — даём кнопку витрины и обновляем меню
   const lang = db.getLang(ctx.chat.id);
-  await ctx.reply(t(lang, 'openShopText'), Markup.inlineKeyboard([Markup.button.webApp(t(lang, 'openShopBtn'), SHOP_URL)]));
-  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
+  // у покупателя старая клавиатура — обновляем её одним сообщением: дальше «📦 Каталог» сам откроет витрину
+  await ctx.reply(t(lang, 'menuUpdated'), buildMainMenu(lang));
 });
 bot.command('catalog', (ctx) => sendCarousel(ctx, -1, 0));
 
@@ -281,7 +281,6 @@ bot.hears([t('ru', 'btnCategories'), t('en', 'btnCategories')], async (ctx) => {
     Markup.button.callback((lang === 'en' && r.category_en) || r.category, `cat_${i}`),
   ]);
   await ctx.reply(t(lang, 'categoriesPrompt'), Markup.inlineKeyboard(buttons));
-  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
 });
 
 bot.action(/^cat_(\d+)$/, (ctx) => {
@@ -309,8 +308,7 @@ bot.on('text', async (ctx, next) => {
       return ctx.reply(t(lang, 'askName'));
     }
     db.setName(ctx.chat.id, name);
-    await ctx.reply(t(lang, 'nameSaved', name));
-    await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
+    await ctx.reply(t(lang, 'nameSaved', name), buildMainMenu(lang));
     return;
   }
 
@@ -325,7 +323,6 @@ bot.on('text', async (ctx, next) => {
     for (const p of products) {
       await renderProductCard(ctx, p, lang);
     }
-    await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
     return;
   }
 
@@ -348,7 +345,6 @@ bot.on('text', async (ctx, next) => {
       console.error('Ошибка AI-консультанта:', err.response?.data || err.message);
       await ctx.reply(t(lang, 'aiError'));
     }
-    await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
     return;
   }
 
@@ -471,7 +467,6 @@ async function showCart(ctx) {
   buttons.push([Markup.button.callback(t(lang, 'checkoutButton'), 'checkout_start')]);
 
   await ctx.reply(text, Markup.inlineKeyboard(buttons));
-  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
 }
 
 bot.action(/dec_(\d+)/, (ctx) => {
@@ -548,7 +543,6 @@ async function showMyOrders(ctx) {
     await ctx.reply(text, { parse_mode: 'HTML' });
   }
 
-  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
 }
 
 // === Оформление заказа / Checkout ===

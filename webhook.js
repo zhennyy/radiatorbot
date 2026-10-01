@@ -8,6 +8,7 @@ const db = require('./db');
 const { checkLowStock } = require('./notify');
 const { t } = require('./i18n');
 const crypto = require('crypto');
+const axios = require('axios');
 const { getPayment } = require('./payments/yookassa');
 
 // фото товаров храним рядом с базой — на Railway это подключённый Volume,
@@ -70,7 +71,44 @@ function startWebhookServer(bot, { showCartFor } = {}) {
       .prepare(`SELECT id, name, name_en, description, description_en, category, category_en, price, stock, photo_url
                 FROM products ORDER BY stock = 0, category, id`)
       .all();
-    res.json({ lang: db.getLang(req.chatId), products, cart: cartMap(req.chatId) });
+    // ссылку на фото не отдаём как есть: картинки идут через наш сервер (/shop-photo),
+    // иначе часть сайтов-источников не показывает их внутри Telegram
+    const list = products.map(({ photo_url, ...p }) => ({
+      ...p,
+      photo: photo_url ? `/shop-photo/${p.id}?v=${crypto.createHash('md5').update(photo_url).digest('hex').slice(0, 8)}` : null,
+    }));
+    res.json({ lang: db.getLang(req.chatId), products: list, cart: cartMap(req.chatId) });
+  });
+
+  // Фото товара через наш сервер: скачиваем по ссылке из админки (или с нашего /uploads) и кэшируем в памяти
+  const photoCache = new Map(); // id → { url, type, buf }
+  app.get('/shop-photo/:id', async (req, res) => {
+    const p = db.prepare('SELECT photo_url FROM products WHERE id = ?').get(parseInt(req.params.id, 10));
+    if (!p || !p.photo_url) return res.sendStatus(404);
+    try {
+      let hit = photoCache.get(req.params.id);
+      if (!hit || hit.url !== p.photo_url) {
+        const local = p.photo_url.match(/\/uploads\/([^/?#]+)$/);
+        if (local && fs.existsSync(path.join(uploadsDir, local[1]))) {
+          return res.set('Cache-Control', 'public, max-age=86400').sendFile(path.join(uploadsDir, local[1]));
+        }
+        let url = p.photo_url;
+        if (!/^https?:\/\//i.test(url)) url = await bot.telegram.getFileLink(url).then(String); // file_id из Telegram
+        const r = await axios.get(url, {
+          responseType: 'arraybuffer', timeout: 10000, maxContentLength: 10 * 1024 * 1024,
+          headers: { 'User-Agent': 'Mozilla/5.0 (RadiatorPro shop)', Accept: 'image/*' },
+        });
+        const type = String(r.headers['content-type'] || '');
+        if (!type.startsWith('image/')) throw new Error('не картинка: ' + type);
+        hit = { url: p.photo_url, type, buf: Buffer.from(r.data) };
+        if (photoCache.size > 200) photoCache.delete(photoCache.keys().next().value);
+        photoCache.set(req.params.id, hit);
+      }
+      res.set({ 'Content-Type': hit.type, 'Cache-Control': 'public, max-age=86400' }).send(hit.buf);
+    } catch (e) {
+      console.warn(`Витрина: фото товара #${req.params.id} не загрузилось —`, e.message);
+      res.sendStatus(404);
+    }
   });
 
   app.post('/shop-api/cart', shopAuth, (req, res) => {

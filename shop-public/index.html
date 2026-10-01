@@ -159,14 +159,16 @@ function ctrl(p) {
   if (!q) return `<button class="add" data-add="${p.id}" aria-label="${L.addBtn}">+</button>`;
   return `<div class="step"><button data-dec="${p.id}">−</button><span>${q}</span><button data-add="${p.id}">+</button></div>`;
 }
-function photo(p, cls = '') {
-  return p.photo_url ? `<img src="${esc(p.photo_url)}" alt="" loading="lazy" ${cls}>` : `<div class="noimg">♨️</div>`;
+const NOIMG = `<div class="noimg">♨️</div>`;
+function photo(p) {
+  // если фото не загрузилось — аккуратная заглушка вместо «битой» картинки
+  return p.photo ? `<img src="${esc(p.photo)}" alt="" loading="lazy" onerror="this.outerHTML=NOIMG">` : NOIMG;
 }
 
 function renderGrid() {
   const q = query.trim().toLowerCase();
   const list = products.filter(p => (!cat || p.category === cat) &&
-    (!q || [p.name, p.name_en, p.description, p.category].join(' ').toLowerCase().includes(q)));
+    (!q || [p.name, p.name_en, p.description, p.category, p.category_en].join(' ').toLowerCase().includes(q)));
   $('grid').innerHTML = list.length ? list.map(p => `
     <article class="card ${p.stock <= 0 ? 'out' : ''}" data-open="${p.id}">
       <div class="ph">${photo(p)}${stockTag(p)}</div>
