@@ -32,7 +32,7 @@ const upload = multer({
   },
 });
 
-function startWebhookServer(bot, { showCartFor } = {}) {
+function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   const app = express();
   app.set('trust proxy', true); // за прокси Railway — иначе req.protocol всегда 'http'
   app.use(express.json());
@@ -124,6 +124,61 @@ function startWebhookServer(bot, { showCartFor } = {}) {
                   ON CONFLICT(chat_id, product_id) DO UPDATE SET quantity = excluded.quantity`).run(req.chatId, productId, qty);
     }
     res.json({ ok: true, cart: cartMap(req.chatId) });
+  });
+
+  // Язык интерфейса (переключатель RU/EN в шапке витрины)
+  app.post('/shop-api/lang', shopAuth, (req, res) => {
+    const lang = req.body.lang === 'en' ? 'en' : 'ru';
+    db.setLang(req.chatId, lang);
+    res.json({ ok: true, lang });
+  });
+
+  // Мои заказы — последние 20 с составом
+  app.get('/shop-api/orders', shopAuth, (req, res) => {
+    const lang = db.getLang(req.chatId);
+    const labels = t(lang, 'orderStatus') || {};
+    const itemsStmt = db.prepare(
+      `SELECT oi.quantity, oi.price, p.id, p.name, p.name_en FROM order_items oi
+       LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`);
+    const orders = db
+      .prepare('SELECT * FROM orders WHERE chat_id = ? ORDER BY created_at DESC LIMIT 20')
+      .all(req.chatId)
+      .map((o) => {
+        const status = String(o.status || '').split(':')[0];
+        return {
+          id: o.id,
+          code: o.order_code || String(o.id),
+          status,
+          statusLabel: labels[status] || status,
+          total: o.total,
+          delivery_cost: o.delivery_cost || 0,
+          address: o.address || '',
+          created_at: o.created_at,
+          items: itemsStmt.all(o.id).map((i) => ({
+            id: i.id, qty: i.quantity, price: i.price,
+            name: (lang === 'en' && i.name_en) || i.name || '—',
+          })),
+        };
+      });
+    res.json({ orders });
+  });
+
+  // AI-подбор: совет + id подходящих товаров (не чаще раза в 5 секунд на человека)
+  const aiLast = new Map();
+  app.post('/shop-api/ai', shopAuth, async (req, res) => {
+    const query = String(req.body.query || '').trim().slice(0, 500);
+    if (!query) return res.status(400).json({ error: 'Опишите, что нужно подобрать' });
+    if (!aiPick) return res.status(503).json({ error: 'AI-подбор сейчас недоступен' });
+    if (Date.now() - (aiLast.get(req.chatId) || 0) < 5000) return res.status(429).json({ error: 'Секунду, ещё думаю над прошлым запросом' });
+    aiLast.set(req.chatId, Date.now());
+    try {
+      const lang = db.getLang(req.chatId);
+      const { adviceText, productIds } = await aiPick(query, lang);
+      res.json({ advice: adviceText, ids: productIds });
+    } catch (e) {
+      console.error('Витрина: AI-подбор не ответил', e.response?.data || e.message);
+      res.status(502).json({ error: t(db.getLang(req.chatId), 'aiError') });
+    }
   });
 
   // «Оформить» в витрине → бот присылает корзину с кнопкой оформления в чат

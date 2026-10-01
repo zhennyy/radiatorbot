@@ -29,14 +29,15 @@ const SHOP_URL =
   (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/shop/` : null);
 
 function buildMainMenu(lang) {
-  // 3 ряда вместо 4 — меню ниже и не закрывает кнопки каталога
-  // «📦 Каталог» сразу открывает витрину (мини-приложение), если известен адрес сервера
-  const catalogBtn = SHOP_URL ? Markup.button.webApp(t(lang, 'btnCatalog'), SHOP_URL) : t(lang, 'btnCatalog');
+  // Есть витрина — нижнего меню нет: всё внутри мини-приложения (кнопка «🛍 Магазин» слева от поля ввода).
+  // Старую клавиатуру у покупателей при этом убираем.
+  if (SHOP_URL) return Markup.removeKeyboard();
+  const catalogBtn = t(lang, 'btnCatalog');
   return Markup.keyboard([
     [catalogBtn, t(lang, 'btnSearch'), t(lang, 'btnCart')],
     [t(lang, 'btnCategories'), t(lang, 'btnMyOrders'), t(lang, 'btnAiPick')],
     [t(lang, 'btnLanguage')],
-  ]).resize().persistent();
+  ]).resize();
 }
 
 bot.start((ctx) => {
@@ -44,15 +45,16 @@ bot.start((ctx) => {
   const name = db.getName(ctx.chat.id);
   if (!name) {
     ctx.session.awaitingName = true;
-    ctx.reply(t(lang, 'welcome'));
+    ctx.reply(t(lang, 'welcome'), buildMainMenu(lang));
     ctx.reply(t(lang, 'askName'));
     return;
   }
-  ctx.reply(t(lang, 'welcomeBack', name), buildMainMenu(lang));
+  ctx.reply(SHOP_URL ? t(lang, 'welcomeBackShop', name) : t(lang, 'welcomeBack', name), buildMainMenu(lang));
 });
 
 // === Переключение языка / Language switch ===
 
+bot.hears([t('ru', 'btnLanguage'), t('en', 'btnLanguage')], (ctx, next) => (SHOP_URL ? shopHint(ctx) : next()));
 bot.hears([t('ru', 'btnLanguage'), t('en', 'btnLanguage')], async (ctx) => {
   const lang = db.getLang(ctx.chat.id);
   await ctx.reply(
@@ -72,12 +74,20 @@ bot.action(/^lang_(ru|en)$/, async (ctx) => {
 
 bot.hears([t('ru', 'btnCatalog'), t('en', 'btnCatalog')], async (ctx) => {
   if (!SHOP_URL) return sendCarousel(ctx, -1, 0);
-  // старая клавиатура без витрины — даём кнопку витрины и обновляем меню
-  const lang = db.getLang(ctx.chat.id);
-  // у покупателя старая клавиатура — обновляем её одним сообщением: дальше «📦 Каталог» сам откроет витрину
-  await ctx.reply(t(lang, 'menuUpdated'), buildMainMenu(lang));
+  return shopHint(ctx);
 });
-bot.command('catalog', (ctx) => sendCarousel(ctx, -1, 0));
+
+// Всё теперь внутри витрины: на старые кнопки отвечаем подсказкой и кнопкой «Открыть магазин»
+async function shopHint(ctx) {
+  const lang = db.getLang(ctx.chat.id);
+  await ctx.reply(t(lang, 'shopMoved'), Markup.inlineKeyboard([Markup.button.webApp(t(lang, 'openShopBtn'), SHOP_URL)]));
+  // убираем старую клавиатуру отдельным тихим сообщением, только если она ещё была
+  if (!ctx.session.kbRemoved) {
+    ctx.session.kbRemoved = true;
+    const m = await ctx.reply('✨', Markup.removeKeyboard()).catch(() => null);
+    if (m) ctx.deleteMessage(m.message_id).catch(() => {});
+  }
+}bot.command('catalog', (ctx) => sendCarousel(ctx, -1, 0));
 
 function escapeHtml(s) {
   return String(s || '')
@@ -270,6 +280,7 @@ bot.action(/^page_(\d+)(?:_c(\d+))?$/, (ctx) => {
 
 // === Категории / Categories ===
 
+bot.hears([t('ru', 'btnCategories'), t('en', 'btnCategories')], (ctx, next) => (SHOP_URL ? shopHint(ctx) : next()));
 bot.hears([t('ru', 'btnCategories'), t('en', 'btnCategories')], async (ctx) => {
   const lang = db.getLang(ctx.chat.id);
   const rows = db
@@ -291,6 +302,7 @@ bot.action(/^cat_(\d+)$/, (ctx) => {
 
 // === Поиск по названию / Search ===
 
+bot.hears([t('ru', 'btnSearch'), t('en', 'btnSearch')], (ctx, next) => (SHOP_URL ? shopHint(ctx) : next()));
 bot.hears([t('ru', 'btnSearch'), t('en', 'btnSearch')], (ctx) => {
   const lang = db.getLang(ctx.chat.id);
   ctx.session.awaitingSearch = true;
@@ -308,7 +320,7 @@ bot.on('text', async (ctx, next) => {
       return ctx.reply(t(lang, 'askName'));
     }
     db.setName(ctx.chat.id, name);
-    await ctx.reply(t(lang, 'nameSaved', name), buildMainMenu(lang));
+    await ctx.reply(SHOP_URL ? t(lang, 'nameSavedShop', name) : t(lang, 'nameSaved', name), buildMainMenu(lang));
     return;
   }
 
@@ -353,6 +365,7 @@ bot.on('text', async (ctx, next) => {
 
 // === AI-консультант по подбору радиатора / AI product-pick consultant ===
 
+bot.hears([t('ru', 'btnAiPick'), t('en', 'btnAiPick')], (ctx, next) => (SHOP_URL ? shopHint(ctx) : next()));
 bot.hears([t('ru', 'btnAiPick'), t('en', 'btnAiPick')], (ctx) => {
   const lang = db.getLang(ctx.chat.id);
   ctx.session.awaitingAiConsult = true;
@@ -444,6 +457,7 @@ bot.action(/add_(\d+)/, (ctx) => {
   ctx.answerCbQuery(t(lang, 'addedToCart'));
 });
 
+bot.hears([t('ru', 'btnCart'), t('en', 'btnCart')], (ctx, next) => (SHOP_URL ? shopHint(ctx) : next()));
 bot.hears([t('ru', 'btnCart'), t('en', 'btnCart')], showCart);
 bot.command('cart', showCart);
 
@@ -496,6 +510,7 @@ bot.action(/rm_(\d+)/, (ctx) => {
 
 // === История заказов покупателя / Buyer's order history ===
 
+bot.hears([t('ru', 'btnMyOrders'), t('en', 'btnMyOrders')], (ctx, next) => (SHOP_URL ? shopHint(ctx) : next()));
 bot.hears([t('ru', 'btnMyOrders'), t('en', 'btnMyOrders')], showMyOrders);
 bot.command('myorders', showMyOrders);
 
@@ -724,8 +739,17 @@ bot.command('markshipped', isOwner, (ctx) => {
 bot.launch();
 console.log('Бот запущен');
 
+// Синяя кнопка «🛍 Магазин» слева от поля ввода — открывает витрину у всех покупателей
+if (SHOP_URL) {
+  bot.telegram
+    .setChatMenuButton({ menuButton: { type: 'web_app', text: '🛍 Магазин', web_app: { url: SHOP_URL } } })
+    .catch((e) => console.error('Не удалось поставить кнопку «Магазин»:', e.message));
+}
+
 const { startWebhookServer } = require('./webhook');
 startWebhookServer(bot, {
+  // AI-подбор из витрины — тот же консультант, что и в чате
+  aiPick: (query, lang) => getAiRecommendation(query, lang),
   // витрина просит показать корзину в чате — используем ту же функцию, что и кнопка «🛒 Корзина»
   showCartFor: (chatId) =>
     showCart({ chat: { id: chatId }, reply: (text, extra) => bot.telegram.sendMessage(chatId, text, extra) }),
