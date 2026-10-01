@@ -40,16 +40,41 @@ function buildMainMenu(lang) {
   ]).resize();
 }
 
-bot.start((ctx) => {
+// Кнопки магазина под приветствием — крупные, чтобы не искать маленькую кнопку у поля ввода
+function shopUrl(tab) {
+  if (!tab) return SHOP_URL;
+  return SHOP_URL + (SHOP_URL.includes('?') ? '&' : '?') + 'tab=' + tab;
+}
+function shopKeyboard(lang) {
+  return Markup.inlineKeyboard([
+    [Markup.button.webApp(t(lang, 'openShopBtn'), shopUrl())],
+    [Markup.button.webApp(t(lang, 'myOrdersBtn'), shopUrl('orders')), Markup.button.webApp(t(lang, 'aiPickBtn'), shopUrl('ai'))],
+  ]);
+}
+async function dropOldKeyboard(ctx) {
+  if (ctx.session.kbRemoved) return;
+  ctx.session.kbRemoved = true;
+  const m = await ctx.reply('✨', Markup.removeKeyboard()).catch(() => null);
+  if (m) ctx.deleteMessage(m.message_id).catch(() => {});
+}
+
+bot.start(async (ctx) => {
   const lang = db.getLang(ctx.chat.id);
   const name = db.getName(ctx.chat.id);
   if (!name) {
     ctx.session.awaitingName = true;
-    ctx.reply(t(lang, 'welcome'), buildMainMenu(lang));
-    ctx.reply(t(lang, 'askName'));
+    if (SHOP_URL) {
+      ctx.session.kbRemoved = true;
+      await ctx.reply(t(lang, 'welcomeShop'), Markup.removeKeyboard());
+    } else {
+      await ctx.reply(t(lang, 'welcome'), buildMainMenu(lang));
+    }
+    await ctx.reply(t(lang, 'askName'));
     return;
   }
-  ctx.reply(SHOP_URL ? t(lang, 'welcomeBackShop', name) : t(lang, 'welcomeBack', name), buildMainMenu(lang));
+  if (!SHOP_URL) return ctx.reply(t(lang, 'welcomeBack', name), buildMainMenu(lang));
+  await dropOldKeyboard(ctx);
+  await ctx.reply(t(lang, 'welcomeBackShop', name), shopKeyboard(lang));
 });
 
 // === Переключение языка / Language switch ===
@@ -80,14 +105,10 @@ bot.hears([t('ru', 'btnCatalog'), t('en', 'btnCatalog')], async (ctx) => {
 // Всё теперь внутри витрины: на старые кнопки отвечаем подсказкой и кнопкой «Открыть магазин»
 async function shopHint(ctx) {
   const lang = db.getLang(ctx.chat.id);
-  await ctx.reply(t(lang, 'shopMoved'), Markup.inlineKeyboard([Markup.button.webApp(t(lang, 'openShopBtn'), SHOP_URL)]));
-  // убираем старую клавиатуру отдельным тихим сообщением, только если она ещё была
-  if (!ctx.session.kbRemoved) {
-    ctx.session.kbRemoved = true;
-    const m = await ctx.reply('✨', Markup.removeKeyboard()).catch(() => null);
-    if (m) ctx.deleteMessage(m.message_id).catch(() => {});
-  }
-}bot.command('catalog', (ctx) => sendCarousel(ctx, -1, 0));
+  await ctx.reply(t(lang, 'shopMoved'), shopKeyboard(lang));
+  await dropOldKeyboard(ctx);
+}
+bot.command('catalog', (ctx) => sendCarousel(ctx, -1, 0));
 
 function escapeHtml(s) {
   return String(s || '')
@@ -320,7 +341,7 @@ bot.on('text', async (ctx, next) => {
       return ctx.reply(t(lang, 'askName'));
     }
     db.setName(ctx.chat.id, name);
-    await ctx.reply(SHOP_URL ? t(lang, 'nameSavedShop', name) : t(lang, 'nameSaved', name), buildMainMenu(lang));
+    await ctx.reply(SHOP_URL ? t(lang, 'nameSavedShop', name) : t(lang, 'nameSaved', name), SHOP_URL ? shopKeyboard(lang) : buildMainMenu(lang));
     return;
   }
 

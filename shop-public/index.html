@@ -673,6 +673,7 @@ document.addEventListener('click', e => {
   else if (d.payorder) payOrder(+d.payorder);
 });
 
+let startTabDone = false;
 async function load() {
   $('grid').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div>';
   try {
@@ -682,6 +683,9 @@ async function load() {
     isOwner = Boolean(d.isOwner);
     $('adminTab').hidden = !isOwner; $('tabs').classList.toggle('five', isOwner);
     renderChips(); renderGrid(); renderCart();
+    const want = new URLSearchParams(location.search).get('tab');
+    if (!startTabDone && ['cart', 'orders', 'ai'].concat(isOwner ? ['admin'] : []).includes(want)) go(want);
+    startTabDone = true;
   } catch (e) {
     $('grid').innerHTML = `<div class="empty"><b>😕</b>${esc(e.message)}${e.fatal ? '' : `<br><br><button class="btn ghost" data-retry>${L.retry}</button>`}</div>`;
   }
