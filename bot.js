@@ -10,14 +10,13 @@ const { checkLowStock } = require('./notify');
 const { t } = require('./i18n');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
-const PAGE_SIZE = 5;
 
 const stage = new Scenes.Stage([checkoutScene]);
 bot.use(session());
 bot.use(stage.middleware());
 
 function formatPrice(kopecks) {
-  return (kopecks / 100).toFixed(0) + ' ₽';
+  return Math.round(kopecks / 100).toLocaleString('ru-RU') + ' ₽';
 }
 
 // Постоянная клавиатура снизу — переприсылаем её после каждого раздела,
@@ -31,16 +30,6 @@ function buildMainMenu(lang) {
     [t(lang, 'btnMyOrders'), t(lang, 'btnAiPick')],
     [t(lang, 'btnLanguage')],
   ]).resize();
-}
-
-function getCatalogPage(page = 0, category = null) {
-  const where = category ? 'WHERE category = ?' : '';
-  const params = category ? [category] : [];
-  const products = db
-    .prepare(`SELECT * FROM products ${where} LIMIT ? OFFSET ?`)
-    .all(...params, PAGE_SIZE, page * PAGE_SIZE);
-  const total = db.prepare(`SELECT COUNT(*) AS c FROM products ${where}`).get(...params).c;
-  return { products, hasNext: (page + 1) * PAGE_SIZE < total, hasPrev: page > 0 };
 }
 
 bot.start((ctx) => {
@@ -74,8 +63,8 @@ bot.action(/^lang_(ru|en)$/, async (ctx) => {
   await ctx.reply(t(lang, 'languageSet'), buildMainMenu(lang));
 });
 
-bot.hears([t('ru', 'btnCatalog'), t('en', 'btnCatalog')], (ctx) => sendCatalogPage(ctx, 0));
-bot.command('catalog', (ctx) => sendCatalogPage(ctx, 0));
+bot.hears([t('ru', 'btnCatalog'), t('en', 'btnCatalog')], (ctx) => sendCarousel(ctx, -1, 0));
+bot.command('catalog', (ctx) => sendCarousel(ctx, -1, 0));
 
 function escapeHtml(s) {
   return String(s || '')
@@ -112,32 +101,147 @@ async function renderProductCard(ctx, p, lang) {
   }
 }
 
-async function sendCatalogPage(ctx, page, category = null) {
-  const lang = db.getLang(ctx.chat.id);
-  const { products, hasNext, hasPrev } = getCatalogPage(page, category);
-  if (!products.length) return ctx.reply(t(lang, 'noProducts'), buildMainMenu(lang));
+// === Каталог-карусель / Catalog carousel ===
+// Одна карточка товара, которая меняется на месте при листании ◀ ▶ —
+// чат не засоряется десятками сообщений. Категории — кнопками под карточкой.
 
-  for (const p of products) {
-    await renderProductCard(ctx, p, lang);
-  }
-
-  const catIndex = category && ctx.session?.catList ? ctx.session.catList.indexOf(category) : -1;
-  const catSuffix = catIndex >= 0 ? `_c${catIndex}` : '';
-
-  const navButtons = [];
-  if (hasPrev) navButtons.push(Markup.button.callback('⬅️', `page_${page - 1}${catSuffix}`));
-  if (hasNext) navButtons.push(Markup.button.callback('➡️', `page_${page + 1}${catSuffix}`));
-  if (navButtons.length) await ctx.reply(t(lang, 'pageNav'), Markup.inlineKeyboard(navButtons));
-
-  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
+function catalogCategories() {
+  return db
+    .prepare('SELECT DISTINCT category, category_en FROM products WHERE category IS NOT NULL ORDER BY category')
+    .all();
 }
 
+function cartCount(chatId) {
+  return db.prepare('SELECT COALESCE(SUM(quantity), 0) AS c FROM cart_items WHERE chat_id = ?').get(chatId).c;
+}
+
+function qtyInCart(chatId, productId) {
+  const row = db.prepare('SELECT quantity FROM cart_items WHERE chat_id = ? AND product_id = ?').get(chatId, productId);
+  return row ? row.quantity : 0;
+}
+
+// ci — номер категории в catalogCategories() (-1 = все), idx — номер товара в списке
+function carouselView(chatId, lang, ci, idx) {
+  const cats = catalogCategories();
+  const cat = ci >= 0 && cats[ci] ? cats[ci].category : null;
+  if (!cat) ci = -1;
+  const products = cat
+    ? db.prepare('SELECT * FROM products WHERE category = ? ORDER BY stock = 0, id').all(cat)
+    : db.prepare('SELECT * FROM products ORDER BY stock = 0, id').all();
+  if (!products.length) return null;
+
+  const n = products.length;
+  idx = ((idx % n) + n) % n; // листаем по кругу
+  const p = products[idx];
+
+  const name = (lang === 'en' && p.name_en) || p.name;
+  const description = (lang === 'en' && p.description_en) || p.description;
+  const category = (lang === 'en' && p.category_en) || p.category;
+  const caption =
+    `🔥 <b>${escapeHtml(name)}</b>\n` +
+    (description ? `<i>${escapeHtml(description)}</i>\n\n` : '\n') +
+    (category ? `🏷 ${escapeHtml(category)}\n` : '') +
+    `${t(lang, 'priceLabel')} <b>${formatPrice(p.price)}</b>\n` +
+    (p.stock > 0 ? t(lang, 'inStock', p.stock) : t(lang, 'outOfStock'));
+
+  const btn = Markup.button.callback;
+  const rows = [];
+  const q = qtyInCart(chatId, p.id);
+  if (p.stock > 0) {
+    rows.push([
+      btn(q ? t(lang, 'inCartQty', q) : `${t(lang, 'addToCart')} · ${formatPrice(p.price)}`, `ca:${ci}:${idx}:${p.id}`),
+    ]);
+  } else {
+    rows.push([btn(t(lang, 'outOfStock'), 'cnoop')]);
+  }
+  if (n > 1) {
+    rows.push([btn('◀️', `cv:${ci}:${idx - 1}`), btn(`${idx + 1} / ${n}`, 'cnoop'), btn('▶️', `cv:${ci}:${idx + 1}`)]);
+  }
+  if (cats.length > 1) {
+    const chips = [{ label: t(lang, 'allCategories'), i: -1 }].concat(
+      cats.map((c, i) => ({ label: (lang === 'en' && c.category_en) || c.category, i }))
+    );
+    for (let k = 0; k < chips.length; k += 3) {
+      rows.push(
+        chips.slice(k, k + 3).map((c) => btn(c.i === ci ? `• ${c.label} •` : c.label, `cv:${c.i}:0`))
+      );
+    }
+  }
+  const inCartTotal = cartCount(chatId);
+  if (inCartTotal > 0) rows.push([btn(t(lang, 'cartShort', inCartTotal), 'copencart')]);
+
+  return { p, caption, markup: Markup.inlineKeyboard(rows).reply_markup };
+}
+
+async function sendCarousel(ctx, ci = -1, idx = 0) {
+  const lang = db.getLang(ctx.chat.id);
+  const v = carouselView(ctx.chat.id, lang, ci, idx);
+  if (!v) return ctx.reply(t(lang, 'noProducts'), buildMainMenu(lang));
+  const extra = { parse_mode: 'HTML', reply_markup: v.markup };
+  if (v.p.photo_url) {
+    return ctx.replyWithPhoto(v.p.photo_url, { caption: v.caption, ...extra }).catch(() => ctx.reply(v.caption, extra));
+  }
+  return ctx.reply(v.caption, extra);
+}
+
+// Перерисовать карусель в том же сообщении
+async function updateCarousel(ctx, ci, idx) {
+  const lang = db.getLang(ctx.chat.id);
+  const v = carouselView(ctx.chat.id, lang, ci, idx);
+  if (!v) return;
+  const isPhoto = Boolean(ctx.callbackQuery.message && ctx.callbackQuery.message.photo);
+  try {
+    if (v.p.photo_url && isPhoto) {
+      await ctx.editMessageMedia(
+        { type: 'photo', media: v.p.photo_url, caption: v.caption, parse_mode: 'HTML' },
+        { reply_markup: v.markup }
+      );
+    } else if (!v.p.photo_url && !isPhoto) {
+      await ctx.editMessageText(v.caption, { parse_mode: 'HTML', reply_markup: v.markup });
+    } else {
+      throw new Error('message type changed');
+    }
+  } catch (e) {
+    if (/not modified/i.test(e.message)) return;
+    // фото ↔ текст нельзя поменять правкой — заменяем сообщение новым
+    await ctx.deleteMessage().catch(() => {});
+    await sendCarousel(ctx, ci, idx);
+  }
+}
+
+bot.action(/^cv:(-?\d+):(-?\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  await updateCarousel(ctx, parseInt(ctx.match[1], 10), parseInt(ctx.match[2], 10));
+});
+
+bot.action(/^ca:(-?\d+):(-?\d+):(\d+)$/, async (ctx) => {
+  const lang = db.getLang(ctx.chat.id);
+  const ci = parseInt(ctx.match[1], 10);
+  const idx = parseInt(ctx.match[2], 10);
+  const productId = parseInt(ctx.match[3], 10);
+  const p = db.prepare('SELECT stock FROM products WHERE id = ?').get(productId);
+  const q = qtyInCart(ctx.chat.id, productId);
+  if (!p || p.stock <= q) return ctx.answerCbQuery(t(lang, 'noMoreStock')).catch(() => {});
+  if (q) {
+    db.prepare('UPDATE cart_items SET quantity = quantity + 1 WHERE chat_id = ? AND product_id = ?').run(ctx.chat.id, productId);
+  } else {
+    db.prepare('INSERT INTO cart_items (chat_id, product_id, quantity) VALUES (?,?,1)').run(ctx.chat.id, productId);
+  }
+  await ctx.answerCbQuery(t(lang, 'addedToCart')).catch(() => {});
+  const v = carouselView(ctx.chat.id, lang, ci, idx);
+  if (v) await ctx.editMessageReplyMarkup(v.markup).catch(() => {});
+});
+
+bot.action('cnoop', (ctx) => ctx.answerCbQuery().catch(() => {}));
+bot.action('copencart', async (ctx) => {
+  await ctx.answerCbQuery().catch(() => {});
+  await showCart(ctx);
+});
+
+// старые кнопки «⬅️ ➡️» из прежних сообщений — открываем карусель
 bot.action(/^page_(\d+)(?:_c(\d+))?$/, (ctx) => {
-  ctx.answerCbQuery();
-  const page = parseInt(ctx.match[1], 10);
-  const category =
-    ctx.match[2] !== undefined ? ctx.session?.catList?.[parseInt(ctx.match[2], 10)] || null : null;
-  sendCatalogPage(ctx, page, category);
+  ctx.answerCbQuery().catch(() => {});
+  return sendCarousel(ctx, -1, 0);
 });
 
 // === Категории / Categories ===
@@ -157,11 +261,9 @@ bot.hears([t('ru', 'btnCategories'), t('en', 'btnCategories')], async (ctx) => {
 });
 
 bot.action(/^cat_(\d+)$/, (ctx) => {
-  const lang = db.getLang(ctx.chat.id);
-  ctx.answerCbQuery();
-  const category = ctx.session?.catList?.[parseInt(ctx.match[1], 10)];
-  if (!category) return ctx.reply(t(lang, 'categoriesStale'));
-  sendCatalogPage(ctx, 0, category);
+  ctx.answerCbQuery().catch(() => {});
+  // номера категорий совпадают с catalogCategories() — тот же запрос и порядок
+  return sendCarousel(ctx, parseInt(ctx.match[1], 10), 0);
 });
 
 // === Поиск по названию / Search ===

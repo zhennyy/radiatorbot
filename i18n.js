@@ -24,6 +24,10 @@ const STRINGS = {
     priceLabel: '💰 Цена:',
     addToCart: '➕ В корзину',
     addedToCart: 'Добавлено в корзину ✅',
+    inCartQty: (n) => `✅ В корзине: ${n} · ещё +1`,
+    allCategories: 'Все',
+    cartShort: (n) => `🛒 Корзина · ${n}`,
+    noMoreStock: 'Больше нет в наличии',
     pageNav: 'Листать:',
 
     categoriesPrompt: 'Выберите категорию:',
@@ -130,6 +134,10 @@ const STRINGS = {
     priceLabel: '💰 Price:',
     addToCart: '➕ Add to cart',
     addedToCart: 'Added to cart ✅',
+    inCartQty: (n) => `✅ In cart: ${n} · add +1`,
+    allCategories: 'All',
+    cartShort: (n) => `🛒 Cart · ${n}`,
+    noMoreStock: 'No more in stock',
     pageNav: 'Browse:',
 
     categoriesPrompt: 'Choose a category:',
