@@ -76,9 +76,11 @@ function makeBackup({ uploadsDir, photosDir }) {
     { name: 'catalog.json', data: JSON.stringify(products, null, 2) },
     { name: 'catalog.csv', data: csv(products.map((p) => ({ id: p.id, name: p.name, category: p.category, price_rub: p.price / 100, stock: p.stock, description: p.description }))) },
     { name: 'orders.json', data: JSON.stringify({ orders, items }, null, 2) },
-    { name: 'orders.csv', data: csv(orders.map((o) => ({ id: o.id, code: o.order_code, created_at: o.created_at, status: String(o.status || '').split(':')[0], total_rub: o.total / 100, delivery_rub: (o.delivery_cost || 0) / 100, address: o.address, promo: o.promo_code }))) },
+    { name: 'orders.csv', data: csv(orders.map((o) => ({ id: o.id, code: o.order_code, created_at: o.created_at, status: String(o.status || '').split(':')[0], total_rub: o.total / 100, delivery_rub: (o.delivery_cost || 0) / 100, address: o.address, promo: o.promo_code, track: o.track, rating: o.rating }))) },
     { name: 'promo_codes.json', data: JSON.stringify(promos, null, 2) },
     { name: 'delivery_rates.json', data: JSON.stringify(delivery, null, 2) },
+    { name: 'settings.json', data: JSON.stringify(db.prepare('SELECT * FROM settings').all(), null, 2) },
+    { name: 'messages.json', data: JSON.stringify(db.prepare('SELECT * FROM messages ORDER BY id').all(), null, 2) },
     { name: 'README.txt', data: `Резервная копия RadiatorPro от ${stamp.replace('_', ' ')} (МСК).\n\ncatalog.csv и orders.csv открываются в Excel/Numbers.\nphotos/ — фото товаров (номер в начале — id товара).\n\nВ архиве есть адреса покупателей — храните его у себя и не выкладывайте на GitHub.\n` },
   );
   return { buffer: zip(files), filename: `radiatorpro-backup-${stamp}.zip`, photos: files.filter((f) => f.name.startsWith('photos/')).length };

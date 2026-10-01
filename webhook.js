@@ -10,6 +10,8 @@ const { t } = require('./i18n');
 const crypto = require('crypto');
 const axios = require('axios');
 const { getPayment } = require('./payments/yookassa');
+const orders = require('./orders');
+const { sendToBuyer } = require('./chat');
 
 // фото товаров храним рядом с базой — на Railway это подключённый Volume,
 // так что файлы переживают редеплой (в отличие от остальной файловой системы)
@@ -152,7 +154,8 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       ...p,
       photo: photo_url ? `/shop-photo/${p.id}?v=${crypto.createHash('md5').update(photo_url).digest('hex').slice(0, 8)}` : null,
     }));
-    res.json({ lang: db.getLang(req.chatId), products: list, cart: cartMap(req.chatId), isOwner: isOwnerId(req.chatId) });
+    const owner = isOwnerId(req.chatId);
+    res.json({ lang: db.getLang(req.chatId), products: list, cart: cartMap(req.chatId), isOwner: owner, unread: owner ? db.unreadTotal() : 0 });
   });
 
   // Фото товара через наш сервер: скачиваем по ссылке из админки (или с нашего /uploads) и кэшируем в памяти
@@ -216,7 +219,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
     const itemsStmt = db.prepare(
       `SELECT oi.quantity, oi.price, p.id, p.name, p.name_en FROM order_items oi
        LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`);
-    const orders = db
+    const list = db
       .prepare('SELECT * FROM orders WHERE chat_id = ? ORDER BY created_at DESC LIMIT 20')
       .all(req.chatId)
       .map((o) => {
@@ -225,7 +228,11 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
           id: o.id,
           code: o.order_code || String(o.id),
           status,
-          statusLabel: labels[status] || status,
+          statusLabel: orders.statusLabel({ base: status, delivery_city: o.delivery_city }, lang) || labels[status] || status,
+          step: orders.FLOW.indexOf(status),
+          pickup: !o.delivery_city,
+          track: o.track || '',
+          rating: o.rating || 0,
           can_pay: status === 'awaiting_payment',
           total: o.total,
           delivery_cost: o.delivery_cost || 0,
@@ -237,7 +244,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
           })),
         };
       });
-    res.json({ orders });
+    res.json({ orders: list });
   });
 
   // AI-подбор: совет + id подходящих товаров (не чаще раза в 5 секунд на человека)
@@ -358,28 +365,30 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   app.get('/shop-api/admin/orders', ...adm, (req, res) => {
     const itemsStmt = db.prepare(`SELECT oi.quantity, oi.price, p.name FROM order_items oi
                                   LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`);
-    const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC, id DESC LIMIT 60').all().map((o) => ({
+    const list = db.prepare('SELECT * FROM orders ORDER BY id DESC LIMIT 150').all().map((o) => ({
       id: o.id, code: o.order_code || String(o.id), status: String(o.status || '').split(':')[0],
-      total: o.total, delivery_cost: o.delivery_cost || 0, address: o.address || '', created_at: o.created_at,
+      total: o.total, delivery_cost: o.delivery_cost || 0, created_at: o.created_at,
+      address: String(o.address || '').replace(/ · тел\..*$/, ''), phone: orders.phoneOf(o),
+      pickup: !o.delivery_city, track: o.track || '', rating: o.rating || 0,
+      promo: o.promo_code || '', discount: o.discount_percent || 0,
       buyer: db.getName(o.chat_id) || '', chat_id: o.chat_id,
       items: itemsStmt.all(o.id).map((i) => ({ name: i.name || '—', qty: i.quantity, price: i.price })),
     }));
-    res.json({ orders });
+    res.json({ orders: list });
   });
 
   app.post('/shop-api/admin/orders/:id/status', ...adm, async (req, res) => {
     const status = String(req.body.status || '');
-    if (!['paid', 'shipped', 'delivered', 'cancelled'].includes(status)) return res.status(400).json({ error: 'Неизвестный статус' });
-    const id = parseInt(req.params.id, 10);
-    const order = db.prepare('SELECT chat_id, order_code FROM orders WHERE id = ?').get(id);
-    if (!order) return res.status(404).json({ error: 'Заказ не найден' });
-    db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, id);
-    if (status === 'shipped') {
-      const lang = db.getLang(order.chat_id);
-      await bot.telegram.sendMessage(order.chat_id, t(lang, 'orderShipped', db.getName(order.chat_id), order.order_code || id)).catch(() => {});
-    }
-    res.json({ ok: true });
+    if (!orders.PAID.has(status) && status !== 'cancelled') return res.status(400).json({ error: 'Неизвестный статус' });
+    try {
+      const o = await orders.changeStatus(bot, parseInt(req.params.id, 10), status,
+        req.body.track !== undefined ? { track: req.body.track } : {});
+      res.json({ ok: true, status: o.base, track: o.track || '' });
+    } catch (e) { res.status(400).json({ error: e.message }); }
   });
+
+  // статистика, чаты, доставка, промокоды
+  require('./admin-api')(app, { bot, adm });
 
   // ===== Оформление и оплата прямо в витрине =====
   // Всё считаем на сервере: цены — из базы, доставка — из тарифов, скидка — из промокода.
@@ -388,7 +397,9 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
 
   app.get('/shop-api/checkout-info', shopAuth, (req, res) => {
     const cities = db.prepare('SELECT city, city_en, price FROM delivery_rates WHERE active = 1 ORDER BY city').all();
-    res.json({ cities, otherPrice: db.DEFAULT_DELIVERY_PRICE, payOnline: Boolean(process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY) });
+    const ds = db.getDeliverySettings();
+    res.json({ cities, otherPrice: ds.otherPrice, freeFrom: ds.freeFrom, pickup: ds.pickup, pickupAddress: ds.pickupAddress,
+      payOnline: Boolean(process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY) });
   });
 
   function findPromo(code) {
@@ -419,7 +430,9 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       // доставка
       let deliveryCity = null, deliveryCost = 0, address;
       const addr = String(b.address || '').trim().slice(0, 300);
+      const ds = db.getDeliverySettings();
       if (b.delivery === 'pickup') {
+        if (!ds.pickup) return res.status(400).json({ error: 'Самовывоза сейчас нет — выберите доставку' });
         address = t(lang, 'pickupSet');
       } else {
         const city = String(b.city || '').trim().slice(0, 80);
@@ -435,6 +448,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       let promo;
       try { promo = findPromo(b.promo); } catch (e) { return res.status(400).json({ error: e.message }); }
       const discounted = promo.percent > 0 ? Math.round((total * (100 - promo.percent)) / 100) : total;
+      if (ds.freeFrom > 0 && discounted >= ds.freeFrom) deliveryCost = 0; // бесплатная доставка от суммы
       const finalTotal = discounted + deliveryCost;
 
       const orderId = createPendingOrder(chatId, address, 'yookassa', finalTotal, promo.code, promo.percent, deliveryCity, deliveryCost);
@@ -502,42 +516,19 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
 
       const orderId = parseInt(payment.metadata && payment.metadata.order_id, 10);
       const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
-      if (!order || order.status === 'paid') return res.sendStatus(200); // защита от дублей
+      if (!order || orders.PAID.has(orders.base(order.status))) return res.sendStatus(200); // защита от дублей
       // Сумма платежа должна совпасть с суммой заказа (в копейках)
       if (Math.round(parseFloat(payment.amount.value) * 100) !== order.total) {
         console.warn(`ЮKassa: сумма платежа ${payment.amount.value} не совпадает с заказом #${orderId}`);
         return res.sendStatus(200);
       }
 
-      db.prepare("UPDATE orders SET status = 'paid' WHERE id = ?").run(orderId);
-
-      const orderItems = db
-        .prepare('SELECT * FROM order_items WHERE order_id = ?')
-        .all(orderId);
-      for (const i of orderItems) {
-        db.prepare('UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?').run(
-          i.quantity,
-          i.product_id
-        );
-      }
-      checkLowStock(bot);
-      db.prepare('DELETE FROM cart_items WHERE chat_id = ?').run(order.chat_id);
-
-      const buyerLang = db.getLang(order.chat_id);
-      const buyerName = db.getName(order.chat_id);
-      await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'paymentReceived', buyerName, order.order_code || orderId));
-
-      if (process.env.OWNER_CHAT_ID) {
-        const itemsText = orderItems
-          .map((i) => {
-            const p = db.prepare('SELECT name FROM products WHERE id = ?').get(i.product_id);
-            return `${p.name} x${i.quantity}`;
-          })
-          .join(', ');
-        await bot.telegram.sendMessage(
-          process.env.OWNER_CHAT_ID,
-          `🆕 Новый оплаченный заказ #${orderId}\n${itemsText}\nСумма: ${(order.total / 100).toFixed(0)} ₽\nАдрес: ${order.address}`
-        );
+      try {
+        await orders.markPaid(bot, orderId); // статус, склад, корзина, сообщения покупателю и владелице
+        checkLowStock(bot);
+      } catch (e) {
+        console.error('ЮKassa: оплата получена, но обработка заказа упала', e.message);
+        return res.sendStatus(500);
       }
     }
 
@@ -753,17 +744,10 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   });
 
   app.post('/api/orders/:id/status', async (req, res) => {
-    const { status } = req.body; // paid | shipped | delivered | cancelled
-    db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, req.params.id);
-    if (status === 'shipped') {
-      const order = db.prepare('SELECT chat_id, order_code FROM orders WHERE id = ?').get(req.params.id);
-      if (order) {
-        const buyerLang = db.getLang(order.chat_id);
-        const buyerName = db.getName(order.chat_id);
-        await bot.telegram.sendMessage(order.chat_id, t(buyerLang, 'orderShipped', buyerName, order.order_code || req.params.id));
-      }
-    }
-    res.json({ ok: true });
+    try {
+      await orders.changeStatus(bot, parseInt(req.params.id, 10), String(req.body.status || ''));
+      res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
   });
 
   // === Промокоды ===

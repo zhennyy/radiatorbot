@@ -159,6 +159,69 @@
   .co .sumrow.big{color:var(--text);font-weight:800;font-size:19px;border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
   .co .ok{color:var(--ok)}
   .order .pay{margin-top:10px}
+
+  /* админка 2.0 */
+  .chips.adm{padding-top:0;margin-bottom:10px}
+  .chips.adm em,.cr .badge{font-style:normal;background:var(--accent);color:#fff;border-radius:9px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:6px}
+  .chips.adm em:empty{display:none}
+  .chips.small{padding:0 0 10px} .chips.small .chip{padding:7px 12px;font-size:13px}
+  .contact{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .mini{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:10px;padding:7px 11px;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+  .oact{display:flex;gap:8px;margin-top:10px}
+  .oact .btn{padding:12px;font-size:15px;border-radius:13px}
+  .oact .btn.small,.btn.small{width:auto;flex:none;padding:12px 14px;font-size:14px}
+  .order.flash{animation:fl 1.6s ease}
+  @keyframes fl{0%,40%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:none}}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .kpi{background:var(--card);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+  .kpi span{font-size:12.5px;color:var(--muted)} .kpi b{font-size:21px;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi i{font-style:normal;font-size:12px;color:var(--muted)}
+  .box{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px}
+  .box h3{margin:0 0 12px;font-size:15px}
+  .bars{display:flex;align-items:flex-end;gap:3px;height:120px;border-bottom:1px solid var(--line)}
+  .bars.dense{gap:1px}
+  .bar{flex:1;height:100%;display:flex;align-items:flex-end;cursor:pointer;min-width:0}
+  .bar i{display:block;width:100%;background:var(--accent);border-radius:4px 4px 0 0;opacity:.85}
+  .axis{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:6px}
+  .hbar{margin-bottom:10px} .hbar .hl{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+  .hbar .hl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hbar .ht{height:6px;background:var(--bg);border-radius:3px;margin:5px 0 2px;overflow:hidden} .hbar .ht i{display:block;height:100%;background:var(--accent);border-radius:3px}
+  .hbar small{color:var(--muted);font-size:12px}
+  .ava{width:44px;height:44px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:800;font-size:18px;flex:none}
+  .cr{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none} .cr small{color:var(--muted);font-size:11.5px}
+  .chathead{display:flex;align-items:center;gap:10px;margin-bottom:10px} .chathead b{font-size:17px}
+  .msgs{display:flex;flex-direction:column;gap:6px;padding-bottom:80px}
+  .msg{max-width:82%;background:var(--card);border-radius:16px 16px 16px 4px;padding:8px 12px;white-space:pre-wrap;word-wrap:break-word;align-self:flex-start}
+  .msg.me{align-self:flex-end;background:var(--accent);color:#fff;border-radius:16px 16px 4px 16px}
+  .msg small{display:block;font-size:11px;opacity:.6;margin-top:3px;text-align:right}
+  .msg img{display:block;max-width:100%;border-radius:12px;margin:-2px 0 4px}
+  .composer{position:fixed;left:0;right:0;bottom:calc(var(--tabh) + env(safe-area-inset-bottom));z-index:7;display:flex;gap:8px;padding:8px 16px;background:var(--bg);border-top:1px solid var(--line);max-width:760px;margin:0 auto}
+  .composer textarea{flex:1;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:18px;padding:10px 14px;font:inherit;resize:none;outline:0;max-height:140px}
+  .composer .btn{width:46px;height:42px;padding:0;border-radius:50%;flex:none;align-self:flex-end}
+  .crow,.prow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .crow input{padding:9px 10px} .crow .cn{flex:2;min-width:0} .crow .cp{flex:none;width:78px}
+  .crow .rub{color:var(--muted);font-size:14px;margin-left:-4px}
+  .crow.off .cn,.crow.off .cp,.prow.off .mid{opacity:.45}
+  .prow .mid{flex:1;min-width:0} .prow .s{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .sw{position:relative;display:inline-block;width:44px;height:26px;flex:none}
+  .sw input{opacity:0;width:0;height:0;position:absolute}
+  .sw i{position:absolute;inset:0;background:var(--line);border-radius:13px;transition:.2s;cursor:pointer}
+  .sw i::after{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .sw input:checked+i{background:var(--ok)} .sw input:checked+i::after{transform:translateX(18px)}
+  .form .line2{display:flex;justify-content:space-between;align-items:center;color:var(--text);font-size:15px;margin:16px 0 8px}
+  .two3{display:grid;grid-template-columns:1.6fr .8fr 1fr;gap:8px;margin-top:6px}
+  .form .two3 input,.form .crow input{width:100%}
+  /* трекер заказа у покупателя */
+  .steps{display:flex;align-items:flex-start;margin:4px 0 12px}
+  .steps div{flex:1;text-align:center;font-size:11.5px;color:var(--muted);position:relative}
+  .steps div::before{content:'';display:block;width:14px;height:14px;border-radius:50%;background:var(--line);margin:0 auto 5px;position:relative;z-index:1}
+  .steps div::after{content:'';position:absolute;top:6px;left:-50%;width:100%;height:2px;background:var(--line)}
+  .steps div:first-child::after{display:none}
+  .steps div.done::before,.steps div.done::after,.steps div.now::after{background:var(--ok)}
+  .steps div.now::before{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+  .steps div.now{color:var(--text);font-weight:700}
+  .pill.assembling{background:var(--accent-soft);color:var(--accent)}
+  .track{margin-top:8px;font-size:14px} .stars{margin-top:6px;color:#f59f00;letter-spacing:2px}
 </style>
 </head>
 <body>
@@ -195,7 +258,7 @@
   <button data-tab="cart"><i>🛒</i><span data-t="tCart"></span><b id="cartCount"></b></button>
   <button data-tab="orders"><i>📦</i><span data-t="tOrders"></span></button>
   <button data-tab="ai"><i>✨</i><span data-t="tAi"></span></button>
-  <button data-tab="admin" id="adminTab" hidden><i>⚙️</i><span data-t="tAdmin"></span></button>
+  <button data-tab="admin" id="adminTab" hidden><i>⚙️</i><span data-t="tAdmin"></span><b id="admBadge"></b></button>
 </div></nav>
 
 <div class="veil" id="veil"></div>
@@ -240,6 +303,7 @@ const nm = p => (lang === 'en' && p.name_en) || p.name;
 const ds = p => (lang === 'en' && p.description_en) || p.description || '';
 const ct = p => (lang === 'en' && p.category_en) || p.category || '';
 const byId = id => products.find(x => x.id == id);
+const when = s => { if (!s) return ''; const d = new Date(String(s).replace(' ', 'T') + 'Z'); return isNaN(d) ? '' : d.toLocaleString(lang === 'en' ? 'en-GB' : 'ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
 
 async function api(path, body, tries = 3) {
   for (let i = 0; ; i++) {
@@ -373,10 +437,14 @@ async function loadOrders() {
   $('v-orders').innerHTML = `<h1>${L.ordersTitle}</h1>` + (orders.length ? orders.map(o => `
     <div class="order">
       <div class="top"><span class="code">№ ${esc(o.code)}</span><span class="pill ${esc(o.status)}">${esc(o.statusLabel)}</span></div>
+      ${o.step >= 0 ? `<div class="steps">${(lang === 'en' ? ['Paid', 'Packing', o.pickup ? 'Ready' : 'Shipped', o.pickup ? 'Picked up' : 'Delivered'] : ['Оплачен', 'Собираем', o.pickup ? 'Готов' : 'Отправлен', o.pickup ? 'Получен' : 'Доставлен'])
+        .map((n, i) => `<div class="${i < o.step || o.step === 3 ? 'done' : i === o.step ? 'now' : ''}">${n}</div>`).join('')}</div>` : ''}
       <ul>${o.items.map(i => `<li><span>${esc(i.name)} × ${i.qty}</span><span>${rub(i.price * i.qty)}</span></li>`).join('')}
         ${o.delivery_cost ? `<li><span>${L.delivery}</span><span>${rub(o.delivery_cost)}</span></li>` : ''}</ul>
       <div class="sum"><span>${L.total}</span><span>${rub(o.total)}</span></div>
-      <div class="meta">${esc((o.created_at || '').slice(0, 16).replace('T', ' '))}${o.address ? ' · ' + esc(o.address) : ''}</div>
+      <div class="meta">${esc(when(o.created_at))}${o.address ? ' · ' + esc(o.address) : ''}</div>
+      ${o.track ? `<div class="track">🚚 ${lang === 'en' ? 'Tracking' : 'Трек-номер'}: <b>${esc(o.track)}</b></div>` : ''}
+      ${o.rating ? `<div class="stars">${'★'.repeat(o.rating)}${'☆'.repeat(5 - o.rating)}</div>` : ''}
       ${o.can_pay ? `<button class="btn pay" data-payorder="${o.id}">💳 Оплатить ${rub(o.total)}</button>` : ''}
     </div>`).join('') : `<div class="empty"><b>📦</b>${L.ordersEmpty}</div>`);
 }
@@ -453,21 +521,43 @@ $('veil').onclick = closeSheet;
 $('q').oninput = e => { query = e.target.value; renderGrid(); };
 $('aiGo').onclick = aiAsk;
 tg?.MainButton?.onClick(() => (tab === 'checkout' ? pay() : tab === 'cart' ? openCheckout() : go('cart')));
-tg?.BackButton?.onClick(() => (openId ? closeSheet() : tab === 'checkout' ? go('cart') : go('catalog')));
+tg?.BackButton?.onClick(() => (document.body.classList.contains('open') ? closeSheet() : tab === 'checkout' ? go('cart') : tab === 'admin' && admMode === 'chats' && chatOpen ? (chatOpen = null, loadAdmin()) : go('catalog')));
 
 
 /* ---------- админка (только владелица) ---------- */
-let isOwner = false, admMode = 'products', admProducts = [], admOrders = [], editId = null;
-const ST = { awaiting_payment: 'ждёт оплату', pending: 'ждёт оплату', paid: 'оплачен', shipped: 'отправлен', delivered: 'доставлен', cancelled: 'отменён' };
+let isOwner = false, unread = 0, admMode = 'orders', admProducts = [], admOrders = [], editId = null;
+let ordFilter = 'active', statsDays = 30, chatOpen = null, chatTimer = null, admSettings = null;
+const ST = { awaiting_payment: '⏳ Ждёт оплату', pending: '⏳ Ждёт оплату', paid: '🆕 Новый', assembling: '📦 Собираем', shipped: '🚚 Отправлен', delivered: '✅ Доставлен', cancelled: '❌ Отменён' };
+const stLabel = o => o.status === 'shipped' && o.pickup ? '🏠 Готов к выдаче' : (ST[o.status] || o.status);
+const FILTERS = [
+  ['active', 'В работе', o => ['paid', 'assembling', 'shipped'].includes(o.status)],
+  ['unpaid', 'Ждут оплату', o => o.status === 'awaiting_payment' || o.status === 'pending'],
+  ['delivered', 'Доставлены', o => o.status === 'delivered'],
+  ['cancelled', 'Отменены', o => o.status === 'cancelled'],
+  ['all', 'Все', () => true],
+];
+const ADM = [['orders', '📦 Заказы'], ['stats', '📊 Статистика'], ['products', '🛍 Товары'], ['chats', '💬 Чаты'], ['settings', '⚙️ Настройки']];
 function ask(q) { return new Promise(ok => (tg?.showConfirm ? tg.showConfirm(q, ok) : ok(confirm(q)))); }
+function setUnread(n) { unread = n || 0; const b = $('admBadge'); if (b) b.textContent = unread || ''; const c = document.querySelector('[data-adm="chats"] em'); if (c) c.textContent = unread || ''; }
+
+function admNav() {
+  return `<div class="chips adm">${ADM.map(([k, l]) => `<button class="chip ${admMode === k ? 'on' : ''}" data-adm="${k}">${l}${k === 'chats' ? `<em>${unread || ''}</em>` : ''}</button>`).join('')}</div>`;
+}
 async function loadAdmin() {
+  stopChatPoll();
   const v = $('v-admin');
-  v.innerHTML = `<h1>Админка</h1><div class="seg"><button data-adm="products" class="${admMode === 'products' ? 'on' : ''}">Товары</button><button data-adm="orders" class="${admMode === 'orders' ? 'on' : ''}">Заказы</button></div><div id="admBody"><div class="skel" style="aspect-ratio:3/1"></div></div>`;
+  v.innerHTML = `<h1>Админка</h1>${admNav()}<div id="admBody"><div class="skel" style="aspect-ratio:3/1"></div></div>`;
+  document.querySelector('.chips.adm .on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   try {
     if (admMode === 'products') { admProducts = (await api('/admin/products')).products; renderAdmProducts(); }
-    else { admOrders = (await api('/admin/orders')).orders; renderAdmOrders(); }
+    else if (admMode === 'orders') { admOrders = (await api('/admin/orders')).orders; renderAdmOrders(); }
+    else if (admMode === 'stats') await loadStats();
+    else if (admMode === 'chats') chatOpen ? await openChat(chatOpen) : await loadChats();
+    else if (admMode === 'settings') { admSettings = await api('/admin/settings'); renderSettings(); }
   } catch (e) { $('admBody').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
+
+/* — товары — */
 function renderAdmProducts() {
   const noPhoto = admProducts.filter(p => !p.has_photo).length;
   $('admBody').innerHTML = `<div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn" data-edit="new" style="flex:2">＋ Новый товар</button><button class="btn ghost" data-backup style="flex:1">📦 Копия</button></div>` +
@@ -533,36 +623,223 @@ $('photoFile').onchange = async e => {
     await reloadAll(); openEditor(id);
   } catch (err) { toast(err.message || 'Не получилось загрузить'); }
 };
-function renderAdmOrders() {
-  const btn = (o, st, label) => `<button class="${o.status === st ? 'on' : ''}" data-ost="${o.id}:${st}">${label}</button>`;
-  $('admBody').innerHTML = admOrders.length ? admOrders.map(o => `
-    <div class="order">
-      <div class="top"><span class="code">№ ${esc(o.code)}${o.buyer ? ' · ' + esc(o.buyer) : ''}</span><span class="pill ${esc(o.status)}">${esc(ST[o.status] || o.status)}</span></div>
-      <ul>${o.items.map(i => `<li><span>${esc(i.name)} × ${i.qty}</span><span>${rub(i.price * i.qty)}</span></li>`).join('')}
-        ${o.delivery_cost ? `<li><span>Доставка</span><span>${rub(o.delivery_cost)}</span></li>` : ''}</ul>
-      <div class="sum"><span>Итого</span><span>${rub(o.total)}</span></div>
-      <div class="meta">${esc((o.created_at || '').slice(0, 16).replace('T', ' '))}${o.address ? ' · ' + esc(o.address) : ''}</div>
-      <div class="ostat">${btn(o, 'paid', '✅ Оплачен')}${btn(o, 'shipped', '🚚 Отправлен')}${btn(o, 'delivered', '📦 Доставлен')}${btn(o, 'cancelled', '✕ Отменить')}</div>
-    </div>`).join('') : `<div class="empty"><b>📦</b>Заказов пока нет</div>`;
+
+/* — заказы — */
+function nextStep(o) {
+  if (o.status === 'awaiting_payment' || o.status === 'pending') return ['paid', '✅ Оплачен (вручную)'];
+  if (o.status === 'paid') return ['assembling', '📦 Начать сборку'];
+  if (o.status === 'assembling') return ['shipped', o.pickup ? '🏠 Готов к выдаче' : '🚚 Отправить'];
+  if (o.status === 'shipped') return ['delivered', o.pickup ? '✅ Выдан' : '✅ Доставлен'];
+  if (o.status === 'cancelled') return ['paid', '↩️ Вернуть в работу'];
+  return null;
 }
-async function setOrderStatus(id, st) {
-  if (st === 'cancelled' && !(await ask('Отменить заказ?'))) return;
+function orderCard(o) {
+  const ns = nextStep(o);
+  const extra = [
+    o.promo ? `🎟 ${esc(o.promo)} −${o.discount}%` : '',
+    o.track ? `🚚 Трек: <b>${esc(o.track)}</b>` : '',
+    o.rating ? `${'★'.repeat(o.rating)}${'☆'.repeat(5 - o.rating)}` : '',
+  ].filter(Boolean).join(' · ');
+  return `
+    <div class="order" id="ord-${o.id}">
+      <div class="top"><span class="code">№ ${esc(o.code)}${o.buyer ? ' · ' + esc(o.buyer) : ''}</span><span class="pill ${esc(o.status)}">${esc(stLabel(o))}</span></div>
+      <ul>${o.items.map(i => `<li><span>${esc(i.name)} × ${i.qty}</span><span>${rub(i.price * i.qty)}</span></li>`).join('')}
+        ${o.pickup ? '' : `<li><span>Доставка</span><span>${o.delivery_cost ? rub(o.delivery_cost) : 'бесплатно'}</span></li>`}</ul>
+      <div class="sum"><span>Итого</span><span>${rub(o.total)}</span></div>
+      <div class="meta">${esc(when(o.created_at))} · ${o.pickup ? '🏠 Самовывоз' : '📍 ' + esc(o.address)}</div>
+      ${extra ? `<div class="meta">${extra}</div>` : ''}
+      <div class="contact">${o.phone ? `<a class="mini" href="tel:${esc(o.phone.replace(/[^\d+]/g, ''))}">📞 ${esc(o.phone)}</a>` : ''}<button class="mini" data-chatwith="${o.chat_id}">💬 Написать</button></div>
+      <div class="oact">${ns ? `<button class="btn" data-ost="${o.id}:${ns[0]}">${ns[1]}</button>` : ''}
+        ${!['cancelled', 'delivered'].includes(o.status) ? `<button class="btn ghost small" data-ost="${o.id}:cancelled">Отменить</button>` : ''}
+        ${o.status === 'shipped' && !o.pickup ? `<button class="btn ghost small" data-track="${o.id}">Трек</button>` : ''}</div>
+    </div>`;
+}
+function renderAdmOrders() {
+  const cnt = k => admOrders.filter(FILTERS.find(f => f[0] === k)[2]).length;
+  const f = FILTERS.find(x => x[0] === ordFilter) || FILTERS[0];
+  const list = admOrders.filter(f[2]);
+  $('admBody').innerHTML = `<div class="chips small">${FILTERS.map(([k, l]) => `<button class="chip ${ordFilter === k ? 'on' : ''}" data-of="${k}">${l}${k !== 'all' && cnt(k) ? ` · ${cnt(k)}` : ''}</button>`).join('')}</div>` +
+    (list.length ? list.map(orderCard).join('') : `<div class="empty"><b>📦</b>${ordFilter === 'active' ? 'Сейчас нет заказов в работе' : 'Здесь пока пусто'}</div>`);
+}
+function trackSheet(id, then) {
+  const o = admOrders.find(x => x.id == id);
+  $('sheet').innerHTML = `<button class="x" data-close>✕</button>
+    <div class="body form" style="padding-top:24px"><h2>Заказ № ${esc(o?.code || id)} отправлен 🚚</h2>
+      <p>Если есть трек-номер — впишите, покупатель получит его в сообщении. Можно оставить пустым.</p>
+      <input id="trackIn" placeholder="Трек-номер (необязательно)" value="${esc(o?.track || '')}" autocapitalize="characters">
+      <div class="actions"><button class="btn" id="trackGo">${then === 'ship' ? 'Отправить уведомление' : 'Сохранить трек'}</button></div></div>`;
+  document.body.classList.add('open'); tg?.BackButton?.show();
+  setTimeout(() => $('trackIn')?.focus(), 250);
+  $('trackGo').onclick = async () => { closeSheet(); await setOrderStatus(id, 'shipped', $('trackIn').value.trim(), true); };
+}
+async function setOrderStatus(id, st, track, skipSheet) {
+  const o = admOrders.find(x => x.id == id);
+  if (st === 'shipped' && o && !o.pickup && !skipSheet) return trackSheet(id, 'ship');
+  if (st === 'cancelled' && !(await ask(['paid', 'assembling', 'shipped'].includes(o?.status)
+    ? 'Отменить заказ? Товар вернётся на склад. Деньги покупателю верните в кабинете ЮKassa.' : 'Отменить заказ?'))) return;
   try {
-    await api(`/admin/orders/${id}/status`, { status: st }, 1);
-    const o = admOrders.find(x => x.id == id); if (o) o.status = st;
-    renderAdmOrders(); toast(st === 'shipped' ? 'Покупателю отправлено уведомление 🚚' : 'Статус обновлён ✓'); haptic('light');
+    const r = await api(`/admin/orders/${id}/status`, track !== undefined ? { status: st, track } : { status: st }, 1);
+    if (o) { o.status = r.status; o.track = r.track; }
+    renderAdmOrders(); haptic('medium');
+    toast(st === 'awaiting_payment' ? 'Статус обновлён ✓' : 'Готово — покупателю отправлено уведомление ✓');
   } catch (e) { toast(e.message); }
 }
+
+/* — статистика — */
+async function loadStats() {
+  const s = await api('/admin/stats?days=' + statsDays);
+  const max = Math.max(1, ...s.byDay.map(d => d.revenue));
+  const topMax = Math.max(1, ...s.top.map(t => t.revenue));
+  const cityMax = Math.max(1, ...s.cities.map(c => c.revenue));
+  const dd = d => d.slice(8, 10) + '.' + d.slice(5, 7);
+  const kpi = (label, val, sub = '') => `<div class="kpi"><span>${label}</span><b>${val}</b>${sub ? `<i>${sub}</i>` : ''}</div>`;
+  $('admBody').innerHTML = `
+    <div class="seg">${[7, 30, 90].map(d => `<button data-days="${d}" class="${statsDays === d ? 'on' : ''}">${d} дней</button>`).join('')}</div>
+    <div class="kpis">
+      ${kpi('Выручка', rub(s.revenue), s.delivery ? `из них доставка ${rub(s.delivery)}` : '')}
+      ${kpi('Оплаченных заказов', s.orders, s.active ? `в работе сейчас: ${s.active}` : '')}
+      ${kpi('Средний чек', rub(s.avg))}
+      ${kpi('Покупателей', s.customers, s.repeat ? `вернулись повторно: ${s.repeat}` : '')}
+      ${kpi('Оценка', s.rating ? `${s.rating} ★` : '—', s.rated ? `оценок: ${s.rated}` : 'ещё нет оценок')}
+      ${kpi('Не оплачено / отмен', `${s.unpaid} / ${s.cancelled}`, s.promoUsed ? `с промокодом: ${s.promoUsed}` : '')}
+    </div>
+    <div class="box"><h3>Выручка по дням</h3>
+      <div class="bars ${s.days > 30 ? 'dense' : ''}">${s.byDay.map(d => `<div class="bar" data-tip="${dd(d.date)}: ${rub(d.revenue)} · заказов ${d.orders}"><i style="height:${d.revenue ? Math.max(4, d.revenue / max * 100) : 0}%"></i></div>`).join('')}</div>
+      <div class="axis"><span>${dd(s.byDay[0].date)}</span><span>сегодня</span></div>
+    </div>
+    <div class="box"><h3>Топ товаров</h3>${s.top.length ? s.top.map(t => `
+      <div class="hbar"><div class="hl"><span>${esc(t.name)}</span><b>${rub(t.revenue)}</b></div><div class="ht"><i style="width:${t.revenue / topMax * 100}%"></i></div><small>${t.qty} шт.</small></div>`).join('') : '<div class="note" style="text-align:left">Продаж за период пока нет</div>'}</div>
+    ${s.cities.length ? `<div class="box"><h3>Города</h3>${s.cities.map(c => `
+      <div class="hbar"><div class="hl"><span>${esc(c.city)}</span><b>${rub(c.revenue)}</b></div><div class="ht"><i style="width:${c.revenue / cityMax * 100}%"></i></div><small>заказов: ${c.orders}</small></div>`).join('')}</div>` : ''}
+    ${s.lowStock.length ? `<div class="box"><h3>⚠️ Заканчивается</h3>${s.lowStock.map(p => `<div class="aline" data-gotoprod="${p.id}" style="margin:0 0 6px;background:var(--bg)"><div class="mid"><div class="t">${esc(p.name)}</div><div class="s"><span class="warn">${p.stock > 0 ? 'осталось ' + p.stock + ' шт.' : 'нет в наличии'}</span></div></div><span style="color:var(--muted)">›</span></div>`).join('')}</div>` : ''}`;
+}
+
+/* — чаты — */
+function stopChatPoll() { clearInterval(chatTimer); chatTimer = null; }
+async function loadChats() {
+  chatOpen = null; stopChatPoll();
+  const d = await api('/admin/chats');
+  setUnread(d.unread);
+  $('admBody').innerHTML = d.chats.length ? d.chats.map(c => `
+    <div class="aline" data-chat="${c.chat_id}">
+      <div class="ava">${esc((c.name || '?').slice(0, 1).toUpperCase())}</div>
+      <div class="mid"><div class="t">${esc(c.name || 'Покупатель')}</div>
+        <div class="s">${c.last?.from_owner ? 'Вы: ' : ''}${c.last?.photo && !c.last?.text ? '📷 Фото' : esc((c.last?.text || '').slice(0, 70))}</div></div>
+      <div class="cr"><small>${esc(when(c.last?.created_at))}</small>${c.unread ? `<b class="badge">${c.unread}</b>` : ''}</div>
+    </div>`).join('') : `<div class="empty"><b>💬</b>Сообщений пока нет.<br>Когда покупатель напишет боту — переписка появится здесь, а уведомление придёт вам в Telegram.</div>`;
+}
+const imgCache = new Map();
+async function authImg(el) {
+  const id = el.dataset.fid;
+  try {
+    let url = imgCache.get(id);
+    if (!url) {
+      const r = await fetch('/shop-api/admin/photo/' + encodeURIComponent(id), { headers: { 'X-Init-Data': tg?.initData || '' } });
+      if (!r.ok) throw 0;
+      url = URL.createObjectURL(await r.blob()); imgCache.set(id, url);
+    }
+    el.src = url;
+  } catch { el.replaceWith(Object.assign(document.createElement('span'), { textContent: '📷 фото' })); }
+}
+let chatSig = '';
+function renderChat(d, keepScroll) {
+  const sig = d.messages.map(m => m.id).join(',');
+  if (keepScroll && sig === chatSig) return;
+  chatSig = sig;
+  const msgs = d.messages.map(m => `
+    <div class="msg ${m.from_owner ? 'me' : ''}">${m.photo ? `<img data-fid="${esc(m.photo)}" alt="">` : ''}${m.text ? `<div>${esc(m.text)}</div>` : ''}<small>${esc(when(m.created_at))}</small></div>`).join('');
+  $('admBody').innerHTML = `
+    <div class="chathead"><button class="mini" data-adm="chats">← Чаты</button><b>${esc(d.name || 'Покупатель')}</b></div>
+    ${d.orders.length ? `<div class="chips small">${d.orders.map(o => `<button class="chip" data-gotoorder="${o.id}">№ ${esc(o.code)} · ${esc(ST[o.status] || o.status)}</button>`).join('')}</div>` : ''}
+    <div class="msgs" id="msgs">${msgs || '<div class="note">Сообщений пока нет — напишите первым</div>'}</div>
+    <div class="composer"><textarea id="reply" rows="1" placeholder="Ответ покупателю…"></textarea><button class="btn" id="sendReply">➤</button></div>`;
+  document.querySelectorAll('#msgs img[data-fid]').forEach(authImg);
+  scrollTo(0, document.body.scrollHeight);
+  const ta = $('reply');
+  ta.oninput = () => { ta.style.height = 'auto'; ta.style.height = Math.min(140, ta.scrollHeight) + 'px'; };
+  $('sendReply').onclick = sendReply;
+}
+async function openChat(chatId) {
+  chatOpen = chatId; chatSig = '';
+  const d = await api('/admin/chats/' + chatId);
+  setUnread(d.unread);
+  renderChat(d);
+  stopChatPoll();
+  chatTimer = setInterval(async () => {
+    if (tab !== 'admin' || admMode !== 'chats' || chatOpen !== chatId || document.hidden) return;
+    if (document.activeElement === $('reply') && $('reply').value) return; // не мешаем печатать
+    try { renderChat(await api('/admin/chats/' + chatId, null, 1), true); } catch {}
+  }, 5000);
+}
+async function sendReply() {
+  const ta = $('reply'); const text = ta.value.trim(); if (!text || !chatOpen) return;
+  $('sendReply').disabled = true;
+  try { const d = await api('/admin/chats/' + chatOpen, { text }, 1); ta.value = ''; chatSig = ''; renderChat({ ...(await api('/admin/chats/' + chatOpen)), messages: d.messages }); haptic('light'); }
+  catch (e) { toast(e.message); }
+  finally { const b = $('sendReply'); if (b) b.disabled = false; }
+}
+
+/* — настройки: доставка, промокоды, копия — */
+function renderSettings() {
+  const s = admSettings, d = s.delivery;
+  const k2r = k => (k ? Math.round(k / 100) : 0);
+  $('admBody').innerHTML = `
+    <div class="box form"><h3>🚚 Доставка по городам</h3>
+      ${s.cities.map(c => `
+        <div class="crow ${c.active ? '' : 'off'}" data-cid="${c.id}">
+          <input class="cn" value="${esc(c.city)}"><input class="cp" type="number" inputmode="numeric" value="${k2r(c.price)}"><span class="rub">₽</span>
+          <label class="sw"><input type="checkbox" class="ca" ${c.active ? 'checked' : ''}><i></i></label>
+          <button class="mini" data-cdel="${c.id}" aria-label="Удалить">🗑</button>
+        </div>`).join('')}
+      <div class="crow new"><input id="ncity" placeholder="Новый город"><input id="nprice" type="number" inputmode="numeric" placeholder="Цена"><span class="rub">₽</span><button class="btn small" data-cadd>＋</button></div>
+      <div class="two">
+        <div><label>Другие города, ₽</label><input id="dOther" type="number" inputmode="numeric" value="${k2r(d.otherPrice)}"></div>
+        <div><label>Бесплатно от суммы, ₽</label><input id="dFree" type="number" inputmode="numeric" value="${d.freeFrom ? k2r(d.freeFrom) : ''}" placeholder="выкл."></div>
+      </div>
+      <label class="line2"><span>🏠 Самовывоз</span><span class="sw"><input type="checkbox" id="dPickup" ${d.pickup ? 'checked' : ''}><i></i></span></label>
+      <input id="dPickupAddr" placeholder="Адрес и часы самовывоза — покупатель увидит после оплаты" value="${esc(d.pickupAddress || '')}">
+      <div class="actions"><button class="btn" data-dsave>Сохранить доставку</button></div>
+    </div>
+    <div class="box form"><h3>🎟 Промокоды</h3>
+      ${s.promos.length ? s.promos.map(p => `
+        <div class="prow ${p.active ? '' : 'off'}">
+          <div class="mid"><b>${esc(p.code)}</b> <span class="pill">−${p.discount_percent}%</span>
+            <div class="s">использован ${p.used_count}${p.max_uses ? ' из ' + p.max_uses : ''} раз</div></div>
+          <label class="sw"><input type="checkbox" data-ptoggle="${p.id}" ${p.active ? 'checked' : ''}><i></i></label>
+          <button class="mini" data-pdel="${p.id}" aria-label="Удалить">🗑</button>
+        </div>`).join('') : '<div class="note" style="text-align:left">Промокодов пока нет</div>'}
+      <div class="two3"><input id="pcode" placeholder="КОД" autocapitalize="characters"><input id="ppct" type="number" inputmode="numeric" placeholder="%"><input id="pmax" type="number" inputmode="numeric" placeholder="лимит"></div>
+      <div class="actions"><button class="btn" data-padd>Создать промокод</button></div>
+    </div>
+    <div class="box"><h3>📦 Резервная копия</h3>
+      <div class="note" style="text-align:left;margin:0 0 10px">Бот пришлёт в чат ZIP: фото, каталог, заказы и промокоды (таблицы открываются в Excel).</div>
+      <button class="btn ghost" data-backup>Получить копию</button>
+    </div>`;
+  document.querySelectorAll('.crow[data-cid]').forEach(row => {
+    const save = async () => {
+      try {
+        admSettings = await api('/admin/cities', { id: +row.dataset.cid, city: row.querySelector('.cn').value, price: row.querySelector('.cp').value, active: row.querySelector('.ca').checked }, 1);
+        row.classList.toggle('off', !row.querySelector('.ca').checked); toast('Сохранено ✓');
+      } catch (e) { toast(e.message); }
+    };
+    row.querySelectorAll('input').forEach(i => i.onchange = save);
+  });
+}
+async function settingsCall(path, body, msg) {
+  try { admSettings = await api(path, body, 1); renderSettings(); if (msg) toast(msg); haptic('light'); } catch (e) { toast(e.message); }
+}
+
 async function reloadAll() {
   try { admProducts = (await api('/admin/products')).products; } catch {}
   try { const d = await api('/catalog'); products = d.products; cart = d.cart || {}; renderChips(); renderGrid(); renderCart(); } catch {}
   if (tab === 'admin' && admMode === 'products') renderAdmProducts();
 }
-document.addEventListener('click', e => {
-  const t = e.target.closest('[data-adm],[data-edit],[data-save],[data-del],[data-photo],[data-ost],[data-purl],[data-backup]');
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-adm],[data-edit],[data-save],[data-del],[data-photo],[data-ost],[data-purl],[data-backup],[data-of],[data-days],[data-chat],[data-chatwith],[data-gotoorder],[data-gotoprod],[data-track],[data-cadd],[data-cdel],[data-dsave],[data-padd],[data-ptoggle],[data-pdel],.bar');
   if (!t) return;
   const d = t.dataset;
-  if (d.adm) { admMode = d.adm; loadAdmin(); }
+  if (t.classList.contains('bar')) toast(d.tip);
+  else if (d.adm) { admMode = d.adm; if (d.adm === 'chats') chatOpen = null; loadAdmin(); }
   else if (d.edit) openEditor(d.edit === 'new' ? 'new' : +d.edit);
   else if (d.save !== undefined) saveProduct();
   else if (d.del) deleteProduct(+d.del);
@@ -578,13 +855,31 @@ document.addEventListener('click', e => {
       .catch(err => toast(err.message));
   }
   else if (d.ost) { const [id, st] = d.ost.split(':'); setOrderStatus(+id, st); }
+  else if (d.track) trackSheet(+d.track, 'track');
+  else if (d.of) { ordFilter = d.of; renderAdmOrders(); }
+  else if (d.days) { statsDays = +d.days; loadStats().catch(err => toast(err.message)); }
+  else if (d.chat) { openChat(+d.chat).catch(err => toast(err.message)); }
+  else if (d.chatwith) { admMode = 'chats'; chatOpen = +d.chatwith; loadAdmin(); }
+  else if (d.gotoorder) {
+    admMode = 'orders'; ordFilter = 'all'; await loadAdmin();
+    const el = $('ord-' + d.gotoorder); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); }
+  }
+  else if (d.gotoprod) { admMode = 'products'; await loadAdmin(); openEditor(+d.gotoprod); }
+  else if (d.cadd !== undefined) settingsCall('/admin/cities', { city: $('ncity').value, price: $('nprice').value }, 'Город добавлен ✓');
+  else if (d.cdel) { if (await ask('Удалить город из списка доставки?')) settingsCall(`/admin/cities/${d.cdel}/delete`, {}, 'Удалено'); }
+  else if (d.dsave !== undefined) settingsCall('/admin/delivery', { otherPrice: $('dOther').value, freeFrom: $('dFree').value, pickup: $('dPickup').checked, pickupAddress: $('dPickupAddr').value }, 'Доставка сохранена ✓');
+  else if (d.padd !== undefined) settingsCall('/admin/promos', { code: $('pcode').value, percent: $('ppct').value, max_uses: $('pmax').value }, 'Промокод создан ✓');
+  else if (d.ptoggle) settingsCall(`/admin/promos/${d.ptoggle}`, { active: t.checked }, t.checked ? 'Промокод включён' : 'Промокод выключен');
+  else if (d.pdel) { if (await ask('Удалить промокод?')) settingsCall(`/admin/promos/${d.pdel}/delete`, {}, 'Удалено'); }
 });
 
 
 /* ---------- оформление и оплата ---------- */
 let co = { delivery: 'city', city: '', other: '', address: '', phone: '', promo: '', promoPct: 0, promoOk: '' }, coInfo = null;
+const coGoods = () => { const { sum } = cartTotals(); return sum - (co.promoPct ? Math.round(sum * co.promoPct / 100) : 0); };
+const coFree = () => Boolean(coInfo && coInfo.freeFrom > 0 && coGoods() >= coInfo.freeFrom);
 const coCost = () => {
-  if (co.delivery === 'pickup' || !coInfo) return 0;
+  if (co.delivery === 'pickup' || !coInfo || coFree()) return 0;
   const c = coInfo.cities.find(x => x.city === co.city);
   return c ? c.price : (co.city === '__other' ? coInfo.otherPrice : 0);
 };
@@ -595,6 +890,8 @@ async function openCheckout() {
     $('v-checkout').innerHTML = `<h1>Оформление</h1><div class="skel" style="aspect-ratio:3/1"></div>`;
     try { coInfo = await api('/checkout-info'); } catch (e) { $('v-checkout').innerHTML = `<h1>Оформление</h1><div class="empty">${esc(e.message)}</div>`; return; }
     if (!co.city && coInfo.cities.length) co.city = (coInfo.cities.find(c => /петербург/i.test(c.city)) || coInfo.cities[0]).city;
+    if (!co.city) co.city = '__other';
+    if (!coInfo.pickup) co.delivery = 'city';
   }
   renderCheckout();
 }
@@ -606,12 +903,13 @@ function renderCheckout() {
   const cityName = c => (lang === 'en' && c.city_en) || c.city;
   $('v-checkout').innerHTML = `<h1>Оформление</h1>
     <div class="box"><h3>Получение</h3>
-      <div class="seg"><button data-dl="city" class="${co.delivery === 'city' ? 'on' : ''}">🚚 Доставка</button><button data-dl="pickup" class="${co.delivery === 'pickup' ? 'on' : ''}">🏠 Самовывоз</button></div>
+      ${coInfo.pickup ? `<div class="seg"><button data-dl="city" class="${co.delivery === 'city' ? 'on' : ''}">🚚 Доставка</button><button data-dl="pickup" class="${co.delivery === 'pickup' ? 'on' : ''}">🏠 Самовывоз</button></div>` : ''}
+      ${co.delivery === 'city' && coInfo.freeFrom > 0 ? `<div class="note" style="text-align:left;margin:0 0 6px">${coFree() ? '🎉 Доставка бесплатно!' : `Бесплатная доставка от ${rub(coInfo.freeFrom)} — осталось ${rub(coInfo.freeFrom - coGoods())}`}</div>` : ''}
       ${co.delivery === 'city' ? `
         <div class="fld"><select id="coCity">${coInfo.cities.map(c => `<option value="${esc(c.city)}" ${co.city === c.city ? 'selected' : ''}>${esc(cityName(c))} — ${rub(c.price)}</option>`).join('')}
           <option value="__other" ${co.city === '__other' ? 'selected' : ''}>Другой город — ${rub(coInfo.otherPrice)}</option></select></div>
         ${co.city === '__other' ? `<div class="fld"><input id="coOther" placeholder="Город" value="${esc(co.other)}"></div>` : ''}
-        <div class="fld"><textarea id="coAddr" placeholder="Улица, дом, квартира, подъезд">${esc(co.address)}</textarea></div>` : `<div class="note" style="text-align:left;margin-top:10px">Заберёте сами — адрес и время пришлём в чат после оплаты.</div>`}
+        <div class="fld"><textarea id="coAddr" placeholder="Улица, дом, квартира, подъезд">${esc(co.address)}</textarea></div>` : `<div class="note" style="text-align:left;margin-top:10px">${coInfo.pickupAddress ? '📍 ' + esc(coInfo.pickupAddress) + '<br>' : ''}Напишем в чат, когда заказ будет готов к выдаче.</div>`}
       <div class="fld"><input id="coPhone" type="tel" inputmode="tel" placeholder="Телефон для связи" value="${esc(co.phone)}"></div>
     </div>
     <div class="box"><h3>Промокод</h3>
@@ -621,7 +919,7 @@ function renderCheckout() {
     <div class="box">
       <div class="sumrow"><span>Товары</span><span>${rub(sum)}</span></div>
       ${disc ? `<div class="sumrow"><span>Скидка ${co.promoPct}%</span><span>−${rub(disc)}</span></div>` : ''}
-      <div class="sumrow"><span>Доставка</span><span>${co.delivery === 'pickup' ? 'бесплатно' : rub(dcost)}</span></div>
+      <div class="sumrow"><span>Доставка</span><span>${co.delivery === 'pickup' || coFree() ? 'бесплатно' : rub(dcost)}</span></div>
       <div class="sumrow big"><span>Итого</span><span>${rub(total)}</span></div>
     </div>
     ${inTg ? '' : `<button class="btn" data-pay>Оплатить · ${rub(total)}</button>`}
@@ -630,7 +928,7 @@ function renderCheckout() {
   bind('coCity', 'city', true); bind('coOther', 'other'); bind('coAddr', 'address'); bind('coPhone', 'phone'); bind('coPromo', 'promo');
   mainButton();
 }
-function coTotal() { const { sum } = cartTotals(); return sum - (co.promoPct ? Math.round(sum * co.promoPct / 100) : 0) + coCost(); }
+function coTotal() { return coGoods() + coCost(); }
 async function applyPromo() {
   co.promo = ($('coPromo')?.value || '').trim();
   if (!co.promo) { co.promoPct = 0; co.promoOk = ''; renderCheckout(); return; }
@@ -682,8 +980,10 @@ async function load() {
     products = d.products; cart = d.cart || {};
     isOwner = Boolean(d.isOwner);
     $('adminTab').hidden = !isOwner; $('tabs').classList.toggle('five', isOwner);
+    if (isOwner) setUnread(d.unread);
     renderChips(); renderGrid(); renderCart();
-    const want = new URLSearchParams(location.search).get('tab');
+    const qs = new URLSearchParams(location.search), want = qs.get('tab');
+    if (isOwner && want === 'admin' && ADM.some(a => a[0] === qs.get('adm'))) { admMode = qs.get('adm'); chatOpen = +qs.get('chat') || null; }
     if (!startTabDone && ['cart', 'orders', 'ai'].concat(isOwner ? ['admin'] : []).includes(want)) go(want);
     startTabDone = true;
   } catch (e) {

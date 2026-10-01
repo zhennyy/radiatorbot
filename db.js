@@ -308,8 +308,75 @@ if (count === 0) {
   );
 }
 
+// ===== Настройки магазина (ключ → JSON), меняются в админке витрины =====
+db.exec(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+function getSetting(key, fallback) {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+  if (!row) return fallback;
+  try { return JSON.parse(row.value); } catch { return fallback; }
+}
+function setSetting(key, value) {
+  db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, JSON.stringify(value));
+}
+// Доставка: цена для городов не из списка, бесплатно от суммы, самовывоз
+const DELIVERY_DEFAULTS = { otherPrice: DEFAULT_DELIVERY_PRICE, freeFrom: 0, pickup: true, pickupAddress: '' };
+const getDeliverySettings = () => ({ ...DELIVERY_DEFAULTS, ...getSetting('delivery', {}) });
+
+// ===== Переписка покупатель ⇄ магазин (вкладка «Чаты» в админке) =====
+db.exec(`
+CREATE TABLE IF NOT EXISTS messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id INTEGER NOT NULL,          -- покупатель
+  from_owner INTEGER NOT NULL DEFAULT 0,
+  text TEXT,
+  photo TEXT,                        -- file_id фото в Telegram
+  owner_msg_id INTEGER,              -- id копии сообщения у владелицы (чтобы ответить реплаем)
+  is_read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS messages_chat ON messages (chat_id, id);
+`);
+function addMessage({ chatId, fromOwner = false, text = null, photo = null, ownerMsgId = null }) {
+  return db.prepare(`INSERT INTO messages (chat_id, from_owner, text, photo, owner_msg_id, is_read)
+                     VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(chatId, fromOwner ? 1 : 0, text, photo, ownerMsgId, fromOwner ? 1 : 0).lastInsertRowid;
+}
+const setOwnerMsgId = (id, ownerMsgId) => db.prepare('UPDATE messages SET owner_msg_id = ? WHERE id = ?').run(ownerMsgId, id);
+const chatByOwnerMsg = (ownerMsgId) => db.prepare('SELECT chat_id FROM messages WHERE owner_msg_id = ?').get(ownerMsgId)?.chat_id || null;
+function getChats() {
+  return db.prepare(`
+    SELECT m.chat_id, MAX(m.id) AS last_id,
+           SUM(CASE WHEN m.is_read = 0 AND m.from_owner = 0 THEN 1 ELSE 0 END) AS unread
+    FROM messages m GROUP BY m.chat_id ORDER BY last_id DESC LIMIT 100`).all()
+    .map((c) => {
+      const last = db.prepare('SELECT text, photo, from_owner, created_at FROM messages WHERE id = ?').get(c.last_id);
+      return { chat_id: c.chat_id, name: getName(c.chat_id) || '', unread: c.unread, last };
+    });
+}
+const getChat = (chatId) => db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY id DESC LIMIT 200').all(chatId).reverse();
+const markChatRead = (chatId) => db.prepare('UPDATE messages SET is_read = 1 WHERE chat_id = ? AND from_owner = 0').run(chatId);
+const unreadTotal = () => db.prepare('SELECT COUNT(*) AS c FROM messages WHERE is_read = 0 AND from_owner = 0').get().c;
+
+// ===== Заказы: трек-номер, оценка, время смены статуса =====
+const oc = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
+if (!oc.includes('track')) db.exec('ALTER TABLE orders ADD COLUMN track TEXT');
+if (!oc.includes('rating')) db.exec('ALTER TABLE orders ADD COLUMN rating INTEGER');
+if (!oc.includes('status_at')) db.exec('ALTER TABLE orders ADD COLUMN status_at TEXT');
+if (!oc.includes('status_msg_id')) db.exec('ALTER TABLE orders ADD COLUMN status_msg_id INTEGER');
+
 module.exports = db;
-module.exports.DEFAULT_DELIVERY_PRICE = 150000; // 1500 ₽
+Object.defineProperty(module.exports, 'DEFAULT_DELIVERY_PRICE', { get: () => getDeliverySettings().otherPrice, enumerable: true });
+module.exports.getSetting = getSetting;
+module.exports.setSetting = setSetting;
+module.exports.getDeliverySettings = getDeliverySettings;
+module.exports.addMessage = addMessage;
+module.exports.setOwnerMsgId = setOwnerMsgId;
+module.exports.chatByOwnerMsg = chatByOwnerMsg;
+module.exports.getChats = getChats;
+module.exports.getChat = getChat;
+module.exports.markChatRead = markChatRead;
+module.exports.unreadTotal = unreadTotal;
 module.exports.getLang = getLang;
 module.exports.setLang = setLang;
 module.exports.getName = getName;
