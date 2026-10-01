@@ -77,7 +77,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       ...p,
       photo: photo_url ? `/shop-photo/${p.id}?v=${crypto.createHash('md5').update(photo_url).digest('hex').slice(0, 8)}` : null,
     }));
-    res.json({ lang: db.getLang(req.chatId), products: list, cart: cartMap(req.chatId) });
+    res.json({ lang: db.getLang(req.chatId), products: list, cart: cartMap(req.chatId), isOwner: isOwnerId(req.chatId) });
   });
 
   // Фото товара через наш сервер: скачиваем по ссылке из админки (или с нашего /uploads) и кэшируем в памяти
@@ -179,6 +179,102 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       console.error('Витрина: AI-подбор не ответил', e.response?.data || e.message);
       res.status(502).json({ error: t(db.getLang(req.chatId), 'aiError') });
     }
+  });
+
+  // ===== Админка внутри витрины — только для владелицы (OWNER_CHAT_ID), без пароля:
+  // Telegram сам подписывает, кто открыл приложение =====
+  const isOwnerId = (id) => Boolean(process.env.OWNER_CHAT_ID) && String(id) === String(process.env.OWNER_CHAT_ID);
+  const ownerOnly = (req, res, next) => (isOwnerId(req.chatId) ? next() : res.status(403).json({ error: 'Только для владелицы' }));
+  const adm = [shopAuth, ownerOnly];
+  const toKop = (v) => Math.round(parseFloat(String(v).replace(',', '.').replace(/\s/g, '')) * 100);
+  const cleanProduct = (b) => {
+    const p = {
+      name: String(b.name || '').trim().slice(0, 120),
+      description: String(b.description || '').trim().slice(0, 1000),
+      price: toKop(b.price),
+      stock: Math.max(0, parseInt(b.stock, 10) || 0),
+      category: String(b.category || '').trim().slice(0, 60) || null,
+      name_en: String(b.name_en || '').trim().slice(0, 120) || null,
+      description_en: String(b.description_en || '').trim().slice(0, 1000) || null,
+      category_en: String(b.category_en || '').trim().slice(0, 60) || null,
+    };
+    if (!p.name) throw new Error('Укажите название');
+    if (!(p.price > 0)) throw new Error('Укажите цену');
+    return p;
+  };
+
+  app.get('/shop-api/admin/products', ...adm, (req, res) => {
+    const rows = db.prepare('SELECT * FROM products ORDER BY category, id').all();
+    res.json({ products: rows.map(({ photo_url, ...p }) => ({ ...p, has_photo: Boolean(photo_url),
+      photo: photo_url ? `/shop-photo/${p.id}?v=${crypto.createHash('md5').update(photo_url).digest('hex').slice(0, 8)}` : null })) });
+  });
+
+  app.post('/shop-api/admin/products', ...adm, (req, res) => {
+    try {
+      const p = cleanProduct(req.body);
+      const r = db.prepare(`INSERT INTO products (name, description, price, stock, category, name_en, description_en, category_en)
+                            VALUES (@name, @description, @price, @stock, @category, @name_en, @description_en, @category_en)`).run(p);
+      res.json({ ok: true, id: r.lastInsertRowid });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.post('/shop-api/admin/products/:id', ...adm, (req, res) => {
+    try {
+      const p = cleanProduct(req.body);
+      const r = db.prepare(`UPDATE products SET name=@name, description=@description, price=@price, stock=@stock, category=@category,
+                            name_en=@name_en, description_en=@description_en, category_en=@category_en WHERE id=@id`)
+        .run({ ...p, id: parseInt(req.params.id, 10) });
+      if (!r.changes) return res.status(404).json({ error: 'Товар не найден' });
+      if (p.stock > 0) checkLowStock(bot);
+      res.json({ ok: true });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  app.post('/shop-api/admin/products/:id/delete', ...adm, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    db.prepare('DELETE FROM cart_items WHERE product_id = ?').run(id);
+    db.prepare('DELETE FROM products WHERE id = ?').run(id);
+    res.json({ ok: true });
+  });
+
+  // Фото с телефона: приходит готовый JPEG (витрина сама уменьшает его до 1600 px)
+  app.post('/shop-api/admin/products/:id/photo', express.raw({ type: 'image/*', limit: '10mb' }), ...adm, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!db.prepare('SELECT id FROM products WHERE id = ?').get(id)) return res.status(404).json({ error: 'Товар не найден' });
+    if (!Buffer.isBuffer(req.body) || req.body.length < 100) return res.status(400).json({ error: 'Файл не получен' });
+    const ext = /png/.test(req.get('content-type')) ? '.png' : /webp/.test(req.get('content-type')) ? '.webp' : '.jpg';
+    const name = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    fs.writeFileSync(path.join(uploadsDir, name), req.body);
+    const url = `${req.protocol}://${req.get('host')}/uploads/${name}`;
+    db.prepare('UPDATE products SET photo_url = ? WHERE id = ?').run(url, id);
+    photoCache.delete(String(id));
+    res.json({ ok: true });
+  });
+
+  app.get('/shop-api/admin/orders', ...adm, (req, res) => {
+    const itemsStmt = db.prepare(`SELECT oi.quantity, oi.price, p.name FROM order_items oi
+                                  LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`);
+    const orders = db.prepare('SELECT * FROM orders ORDER BY created_at DESC, id DESC LIMIT 60').all().map((o) => ({
+      id: o.id, code: o.order_code || String(o.id), status: String(o.status || '').split(':')[0],
+      total: o.total, delivery_cost: o.delivery_cost || 0, address: o.address || '', created_at: o.created_at,
+      buyer: db.getName(o.chat_id) || '', chat_id: o.chat_id,
+      items: itemsStmt.all(o.id).map((i) => ({ name: i.name || '—', qty: i.quantity, price: i.price })),
+    }));
+    res.json({ orders });
+  });
+
+  app.post('/shop-api/admin/orders/:id/status', ...adm, async (req, res) => {
+    const status = String(req.body.status || '');
+    if (!['paid', 'shipped', 'delivered', 'cancelled'].includes(status)) return res.status(400).json({ error: 'Неизвестный статус' });
+    const id = parseInt(req.params.id, 10);
+    const order = db.prepare('SELECT chat_id, order_code FROM orders WHERE id = ?').get(id);
+    if (!order) return res.status(404).json({ error: 'Заказ не найден' });
+    db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, id);
+    if (status === 'shipped') {
+      const lang = db.getLang(order.chat_id);
+      await bot.telegram.sendMessage(order.chat_id, t(lang, 'orderShipped', db.getName(order.chat_id), order.order_code || id)).catch(() => {});
+    }
+    res.json({ ok: true });
   });
 
   // «Оформить» в витрине → бот присылает корзину с кнопкой оформления в чат

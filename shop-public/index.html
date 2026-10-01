@@ -122,6 +122,31 @@
   .toast.on{transform:translate(-50%,0)}
   .skel{background:linear-gradient(90deg,var(--card),var(--line),var(--card));background-size:200% 100%;animation:sk 1.2s infinite;border-radius:var(--r);aspect-ratio:3/4}
   @keyframes sk{to{background-position:-200% 0}}
+
+  /* админка */
+  .seg{display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:12px}
+  .seg button{flex:1;border:0;background:transparent;color:var(--muted);padding:9px;border-radius:9px;font-weight:700;cursor:pointer}
+  .seg button.on{background:var(--text);color:var(--bg)}
+  .aline{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:16px;padding:10px;margin-bottom:8px;cursor:pointer}
+  .aline .thumb{width:56px;height:56px;border-radius:12px;overflow:hidden;background:var(--photo);display:grid;place-items:center;flex:none}
+  .aline .thumb img{width:100%;height:100%;object-fit:cover} .aline .thumb .noimg{font-size:22px}
+  .aline .mid{flex:1;min-width:0} .aline .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .aline .s{font-size:13px;color:var(--muted);margin-top:3px}
+  .aline .s .warn{color:var(--accent);font-weight:600}
+  .form label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}
+  .form input,.form textarea{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;outline:0}
+  .form textarea{min-height:76px;resize:vertical}
+  .form .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .form details{margin-top:12px} .form summary{color:var(--muted);font-size:14px;cursor:pointer}
+  .form .actions{display:flex;gap:10px;margin-top:16px}
+  .btn.danger{background:transparent;color:var(--bad);border:1px solid rgba(201,42,42,.35)}
+  .photoEdit{position:relative}
+  .photoEdit .up{position:absolute;right:12px;bottom:12px;border:0;border-radius:12px;background:rgba(0,0,0,.6);color:#fff;padding:10px 14px;font-weight:700;cursor:pointer}
+  .ostat{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .ostat button{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:10px;padding:7px 10px;font-size:13px;cursor:pointer}
+  .ostat button.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+  .tabs .in.five{grid-template-columns:repeat(5,1fr)}
+  .tabs button[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -140,6 +165,8 @@
   <section class="view" id="v-cart"></section>
   <section class="view" id="v-orders"></section>
 
+  <section class="view" id="v-admin"></section>
+
   <section class="view ai" id="v-ai">
     <h1 id="aiTitle"></h1>
     <textarea id="aiQ"></textarea>
@@ -155,11 +182,13 @@
   <button data-tab="cart"><i>🛒</i><span data-t="tCart"></span><b id="cartCount"></b></button>
   <button data-tab="orders"><i>📦</i><span data-t="tOrders"></span></button>
   <button data-tab="ai"><i>✨</i><span data-t="tAi"></span></button>
+  <button data-tab="admin" id="adminTab" hidden><i>⚙️</i><span data-t="tAdmin"></span></button>
 </div></nav>
 
 <div class="veil" id="veil"></div>
 <section class="sheet" id="sheet"></section>
 <div class="toast" id="toast"></div>
+<input type="file" id="photoFile" accept="image/*" hidden>
 
 <script>
 const tg = window.Telegram && Telegram.WebApp;
@@ -167,7 +196,7 @@ const inTg = Boolean(tg && tg.initData);
 if (tg) { tg.ready(); tg.expand(); document.documentElement.dataset.theme = tg.colorScheme === 'dark' ? 'dark' : 'light'; }
 
 const T = {
-  ru: { tCatalog: 'Каталог', tCart: 'Корзина', tOrders: 'Заказы', tAi: 'AI-подбор', all: 'Все', search: 'Поиск радиаторов',
+  ru: { tCatalog: 'Каталог', tCart: 'Корзина', tOrders: 'Заказы', tAi: 'AI-подбор', tAdmin: 'Админка', all: 'Все', search: 'Поиск радиаторов',
         inStock: n => `В наличии ${n} шт.`, low: n => `Осталось ${n}`, out: 'Нет в наличии', empty: 'Ничего не нашлось',
         checkout: s => `Оформить · ${s}`, noMore: 'Больше нет в наличии', addBtn: 'В корзину', total: 'Итого',
         err: 'Не получилось загрузить. Проверьте интернет и попробуйте ещё раз.', retry: 'Обновить',
@@ -177,7 +206,7 @@ const T = {
         ordersTitle: 'Мои заказы', ordersEmpty: 'Заказов пока нет', delivery: 'Доставка',
         aiTitle: 'Подберём радиатор', aiPh: 'Опишите комнату: площадь, где стоит, стиль, бюджет…', aiGo: 'Подобрать', aiWait: 'Подбираю',
         aiHints: ['Ванная 5 м², хром, до 10 000 ₽', 'Гостиная 25 м², белый, вертикальный', 'Лофт, чёрный, большой'], aiNone: 'Под запрос ничего не нашлось — попробуйте описать иначе' },
-  en: { tCatalog: 'Catalog', tCart: 'Cart', tOrders: 'Orders', tAi: 'AI pick', all: 'All', search: 'Search radiators',
+  en: { tCatalog: 'Catalog', tCart: 'Cart', tOrders: 'Orders', tAi: 'AI pick', tAdmin: 'Admin', all: 'All', search: 'Search radiators',
         inStock: n => `In stock: ${n}`, low: n => `Only ${n} left`, out: 'Out of stock', empty: 'Nothing found',
         checkout: s => `Checkout · ${s}`, noMore: 'No more in stock', addBtn: 'Add to cart', total: 'Total',
         err: 'Could not load. Check your connection and try again.', retry: 'Retry',
@@ -293,7 +322,7 @@ function mainButton() {
   if (!inTg || !tg.MainButton) return;
   const { n, sum } = cartTotals();
   // в корзине — «Оформить», на других вкладках при непустой корзине — «Корзина · сумма»
-  if (n > 0 && tab !== 'orders') {
+  if (n > 0 && tab !== 'orders' && tab !== 'admin') {
     tg.MainButton.setParams({ text: tab === 'cart' ? L.checkout(rub(sum)) : `🛒 ${L.tCart} · ${rub(sum)}`, color: '#e8590c', text_color: '#ffffff' });
     tg.MainButton.show();
   } else tg.MainButton.hide();
@@ -379,6 +408,7 @@ function go(t) {
   document.querySelectorAll('section.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + t));
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if (t === 'orders') loadOrders();
+  if (t === 'admin') loadAdmin();
   if (t === 'cart') renderCart();
   if (t === 'catalog') tg?.BackButton?.hide(); else tg?.BackButton?.show();
   mainButton();
@@ -410,12 +440,128 @@ $('aiGo').onclick = aiAsk;
 tg?.MainButton?.onClick(() => (tab === 'cart' ? checkout() : go('cart')));
 tg?.BackButton?.onClick(() => (openId ? closeSheet() : go('catalog')));
 
+
+/* ---------- админка (только владелица) ---------- */
+let isOwner = false, admMode = 'products', admProducts = [], admOrders = [], editId = null;
+const ST = { awaiting_payment: 'ждёт оплату', pending: 'ждёт оплату', paid: 'оплачен', shipped: 'отправлен', delivered: 'доставлен', cancelled: 'отменён' };
+function ask(q) { return new Promise(ok => (tg?.showConfirm ? tg.showConfirm(q, ok) : ok(confirm(q)))); }
+async function loadAdmin() {
+  const v = $('v-admin');
+  v.innerHTML = `<h1>Админка</h1><div class="seg"><button data-adm="products" class="${admMode === 'products' ? 'on' : ''}">Товары</button><button data-adm="orders" class="${admMode === 'orders' ? 'on' : ''}">Заказы</button></div><div id="admBody"><div class="skel" style="aspect-ratio:3/1"></div></div>`;
+  try {
+    if (admMode === 'products') { admProducts = (await api('/admin/products')).products; renderAdmProducts(); }
+    else { admOrders = (await api('/admin/orders')).orders; renderAdmOrders(); }
+  } catch (e) { $('admBody').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+function renderAdmProducts() {
+  const noPhoto = admProducts.filter(p => !p.has_photo).length;
+  $('admBody').innerHTML = `<button class="btn" data-edit="new" style="margin-bottom:12px">＋ Новый товар</button>` +
+    (noPhoto ? `<div class="note" style="margin:0 0 10px">Без фото: ${noPhoto} — нажмите на товар и «📷 Фото»</div>` : '') +
+    admProducts.map(p => `
+    <div class="aline" data-edit="${p.id}">
+      <div class="thumb">${photo(p)}</div>
+      <div class="mid"><div class="t">${esc(p.name)}</div>
+        <div class="s">${rub(p.price)} · ${p.stock > 0 ? (p.stock <= 3 ? `<span class="warn">осталось ${p.stock}</span>` : `${p.stock} шт.`) : '<span class="warn">нет в наличии</span>'}${p.category ? ' · ' + esc(p.category) : ''}${p.has_photo ? '' : ' · <span class="warn">без фото</span>'}</div></div>
+      <span style="color:var(--muted)">›</span>
+    </div>`).join('');
+}
+function openEditor(id) {
+  editId = id;
+  const p = id === 'new' ? { name: '', price: '', stock: 1, category: '', description: '' } : admProducts.find(x => x.id == id);
+  if (!p) return;
+  const f = (k, label, type = 'text', extra = '') => `<label>${label}</label><input name="${k}" type="${type}" value="${esc(k === 'price' && p.price ? Math.round(p.price / 100) : p[k] ?? '')}" ${extra}>`;
+  $('sheet').innerHTML = `<button class="x" data-close>✕</button>
+    ${id === 'new' ? '' : `<div class="big photoEdit">${photo(p)}<button class="up" data-photo="${p.id}">📷 ${p.has_photo ? 'Заменить фото' : 'Добавить фото'}</button></div>`}
+    <form class="body form" id="pform" onsubmit="return false">
+      <h2>${id === 'new' ? 'Новый товар' : 'Редактирование'}</h2>
+      ${f('name', 'Название')}
+      <div class="two"><div>${f('price', 'Цена, ₽', 'number', 'inputmode="numeric" min="1"')}</div><div>${f('stock', 'Остаток, шт.', 'number', 'inputmode="numeric" min="0"')}</div></div>
+      ${f('category', 'Категория', 'text', 'list="cats"')}
+      <datalist id="cats">${[...new Set(admProducts.map(x => x.category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+      <label>Описание</label><textarea name="description">${esc(p.description || '')}</textarea>
+      <details><summary>English (необязательно)</summary>
+        ${f('name_en', 'Name')}${f('category_en', 'Category')}<label>Description</label><textarea name="description_en">${esc(p.description_en || '')}</textarea>
+      </details>
+      <div class="actions">${id === 'new' ? '' : `<button class="btn danger" data-del="${p.id}" style="flex:1">Удалить</button>`}<button class="btn" data-save style="flex:2">${id === 'new' ? 'Создать' : 'Сохранить'}</button></div>
+      ${id === 'new' ? '<div class="note">Фото можно добавить сразу после создания</div>' : ''}
+    </form>`;
+  document.body.classList.add('open'); tg?.BackButton?.show();
+}
+async function saveProduct() {
+  const data = Object.fromEntries(new FormData($('pform')).entries());
+  try {
+    if (editId === 'new') { const r = await api('/admin/products', data, 1); toast('Товар создан ✓'); await reloadAll(); openEditor(r.id); }
+    else { await api('/admin/products/' + editId, data, 1); toast('Сохранено ✓'); closeSheet(); await reloadAll(); }
+    haptic('medium');
+  } catch (e) { toast(e.message); }
+}
+async function deleteProduct(id) {
+  if (!(await ask('Удалить товар? Его уберут из каталога и корзин покупателей.'))) return;
+  try { await api(`/admin/products/${id}/delete`, {}, 1); toast('Удалено'); closeSheet(); await reloadAll(); } catch (e) { toast(e.message); }
+}
+let photoFor = null;
+function pickPhoto(id) { photoFor = id; $('photoFile').value = ''; $('photoFile').click(); }
+$('photoFile').onchange = async e => {
+  const file = e.target.files[0]; if (!file || !photoFor) return;
+  const id = photoFor; photoFor = null;
+  try {
+    toast('Загружаю фото…');
+    const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = URL.createObjectURL(file); });
+    const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.85));
+    const r = await fetch(`/shop-api/admin/products/${id}/photo`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'X-Init-Data': tg?.initData || '' }, body: blob });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Не получилось загрузить');
+    toast('Фото обновлено ✓'); haptic('medium');
+    await reloadAll(); openEditor(id);
+  } catch (err) { toast(err.message || 'Не получилось загрузить'); }
+};
+function renderAdmOrders() {
+  const btn = (o, st, label) => `<button class="${o.status === st ? 'on' : ''}" data-ost="${o.id}:${st}">${label}</button>`;
+  $('admBody').innerHTML = admOrders.length ? admOrders.map(o => `
+    <div class="order">
+      <div class="top"><span class="code">№ ${esc(o.code)}${o.buyer ? ' · ' + esc(o.buyer) : ''}</span><span class="pill ${esc(o.status)}">${esc(ST[o.status] || o.status)}</span></div>
+      <ul>${o.items.map(i => `<li><span>${esc(i.name)} × ${i.qty}</span><span>${rub(i.price * i.qty)}</span></li>`).join('')}
+        ${o.delivery_cost ? `<li><span>Доставка</span><span>${rub(o.delivery_cost)}</span></li>` : ''}</ul>
+      <div class="sum"><span>Итого</span><span>${rub(o.total)}</span></div>
+      <div class="meta">${esc((o.created_at || '').slice(0, 16).replace('T', ' '))}${o.address ? ' · ' + esc(o.address) : ''}</div>
+      <div class="ostat">${btn(o, 'paid', '✅ Оплачен')}${btn(o, 'shipped', '🚚 Отправлен')}${btn(o, 'delivered', '📦 Доставлен')}${btn(o, 'cancelled', '✕ Отменить')}</div>
+    </div>`).join('') : `<div class="empty"><b>📦</b>Заказов пока нет</div>`;
+}
+async function setOrderStatus(id, st) {
+  if (st === 'cancelled' && !(await ask('Отменить заказ?'))) return;
+  try {
+    await api(`/admin/orders/${id}/status`, { status: st }, 1);
+    const o = admOrders.find(x => x.id == id); if (o) o.status = st;
+    renderAdmOrders(); toast(st === 'shipped' ? 'Покупателю отправлено уведомление 🚚' : 'Статус обновлён ✓'); haptic('light');
+  } catch (e) { toast(e.message); }
+}
+async function reloadAll() {
+  try { admProducts = (await api('/admin/products')).products; } catch {}
+  try { const d = await api('/catalog'); products = d.products; cart = d.cart || {}; renderChips(); renderGrid(); renderCart(); } catch {}
+  if (tab === 'admin' && admMode === 'products') renderAdmProducts();
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-adm],[data-edit],[data-save],[data-del],[data-photo],[data-ost]');
+  if (!t) return;
+  const d = t.dataset;
+  if (d.adm) { admMode = d.adm; loadAdmin(); }
+  else if (d.edit) openEditor(d.edit === 'new' ? 'new' : +d.edit);
+  else if (d.save !== undefined) saveProduct();
+  else if (d.del) deleteProduct(+d.del);
+  else if (d.photo) pickPhoto(+d.photo);
+  else if (d.ost) { const [id, st] = d.ost.split(':'); setOrderStatus(+id, st); }
+});
+
 async function load() {
   $('grid').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div>';
   try {
     const d = await api('/catalog');
     lang = d.lang === 'en' ? 'en' : 'ru'; applyLang();
     products = d.products; cart = d.cart || {};
+    isOwner = Boolean(d.isOwner);
+    $('adminTab').hidden = !isOwner; $('tabs').classList.toggle('five', isOwner);
     renderChips(); renderGrid(); renderCart();
   } catch (e) {
     $('grid').innerHTML = `<div class="empty"><b>😕</b>${esc(e.message)}${e.fatal ? '' : `<br><br><button class="btn ghost" data-retry>${L.retry}</button>`}</div>`;
