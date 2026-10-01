@@ -32,6 +32,61 @@ const upload = multer({
   },
 });
 
+// ===== Все фото товаров храним у себя: папка uploads на постоянном диске Railway =====
+// Если у товара ссылка на чужой сайт — скачиваем картинку один раз и дальше показываем свою копию.
+const PUBLIC_BASE = process.env.PUBLIC_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
+const isLocalPhoto = (url) => /\/uploads\/[^/?#]+$/.test(String(url || '')) && fs.existsSync(path.join(uploadsDir, String(url).split('/uploads/')[1]));
+
+async function localizePhoto(id, url) {
+  if (!url || isLocalPhoto(url) || !/^https?:\/\//i.test(url) || !PUBLIC_BASE) return false;
+  const r = await require('axios').get(url, {
+    responseType: 'arraybuffer', timeout: 20000, maxContentLength: 15 * 1024 * 1024,
+    headers: { 'User-Agent': 'Mozilla/5.0 (RadiatorPro shop)', Accept: 'image/*' },
+  });
+  const type = String(r.headers['content-type'] || '');
+  if (!type.startsWith('image/')) throw new Error('по ссылке не картинка (' + type + ')');
+  const ext = type.includes('png') ? '.png' : type.includes('webp') ? '.webp' : '.jpg';
+  const name = `p${id}-${Date.now()}${ext}`;
+  fs.writeFileSync(path.join(uploadsDir, name), Buffer.from(r.data));
+  db.prepare('UPDATE products SET photo_url = ? WHERE id = ? AND photo_url = ?').run(`${PUBLIC_BASE}/uploads/${name}`, id, url);
+  return true;
+}
+
+let localizing = null;
+function localizeAllPhotos() {
+  if (localizing) return localizing;
+  localizing = (async () => {
+    const rows = db.prepare('SELECT id, name, photo_url FROM products WHERE photo_url IS NOT NULL').all();
+    for (const p of rows) {
+      try {
+        if (await localizePhoto(p.id, p.photo_url)) console.log(`Фото «${p.name}» сохранено на сервере`);
+      } catch (e) {
+        console.warn(`Фото «${p.name}» не скачалось: ${e.message}`);
+      }
+    }
+  })().finally(() => { localizing = null; });
+  return localizing;
+}
+
+// Разовые правки каталога (выполняются один раз — отметка лежит рядом с фото)
+function runOnce(key, fn) {
+  const mark = path.join(uploadsDir, `.done-${key}`);
+  if (fs.existsSync(mark)) return;
+  try { fn(); fs.writeFileSync(mark, new Date().toISOString()); } catch (e) { console.error('Разовая правка не прошла:', key, e.message); }
+}
+runOnce('2026-10-01-catalog', () => {
+  // убираем тестовый товар
+  const test = db.prepare("SELECT id FROM products WHERE name = 'Радиатор Test' AND description = 'Тестовое описание'").get();
+  if (test) {
+    db.prepare('DELETE FROM cart_items WHERE product_id = ?').run(test.id);
+    db.prepare('DELETE FROM products WHERE id = ?').run(test.id);
+    console.log('Тестовый товар удалён');
+  }
+  // новое фото для Loft Black (сгенерировано), сервер скачает его к себе
+  db.prepare("UPDATE products SET photo_url = ? WHERE name = 'Радиатор Loft Black'")
+    .run('https://d8j0ntlcm91z4.cloudfront.net/user_3HReZJSR0X0kuSZvadzwtcMlq6H/hf_20261001_131313_2e81d209-1a55-474f-890e-5aa4c5c66469.png');
+});
+
 function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   const app = express();
   app.set('trust proxy', true); // за прокси Railway — иначе req.protocol всегда 'http'
@@ -261,7 +316,9 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
     const r = db.prepare('UPDATE products SET photo_url = ? WHERE id = ?').run(url, id);
     if (!r.changes) return res.status(404).json({ error: 'Товар не найден' });
     photoCache.delete(String(id));
-    res.json({ ok: true });
+    localizeAllPhotos()
+      .then(() => res.json({ ok: true, local: isLocalPhoto(db.prepare('SELECT photo_url FROM products WHERE id = ?').get(id).photo_url) }))
+      .catch(() => res.json({ ok: true, local: false }));
   });
 
   app.get('/shop-api/admin/orders', ...adm, (req, res) => {
@@ -413,6 +470,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       category_en || null,
       req.params.id
     );
+    localizeAllPhotos();
     res.json({ ok: true });
   });
 
@@ -662,6 +720,10 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
     );
     res.json({ ok: true });
   });
+
+  // при старте и раз в 6 часов проверяем, что все фото лежат у нас
+  setTimeout(localizeAllPhotos, 5000);
+  setInterval(localizeAllPhotos, 6 * 3600 * 1000);
 
   const port = process.env.WEBHOOK_PORT || 3001;
   app.listen(port, () =>
