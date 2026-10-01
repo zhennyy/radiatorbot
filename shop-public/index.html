@@ -470,7 +470,7 @@ async function loadAdmin() {
 }
 function renderAdmProducts() {
   const noPhoto = admProducts.filter(p => !p.has_photo).length;
-  $('admBody').innerHTML = `<button class="btn" data-edit="new" style="margin-bottom:12px">＋ Новый товар</button>` +
+  $('admBody').innerHTML = `<div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn" data-edit="new" style="flex:2">＋ Новый товар</button><button class="btn ghost" data-backup style="flex:1">📦 Копия</button></div>` +
     (noPhoto ? `<div class="note" style="margin:0 0 10px">Без фото: ${noPhoto} — нажмите на товар и «📷 Фото»</div>` : '') +
     admProducts.map(p => `
     <div class="aline" data-edit="${p.id}">
@@ -559,7 +559,7 @@ async function reloadAll() {
   if (tab === 'admin' && admMode === 'products') renderAdmProducts();
 }
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-adm],[data-edit],[data-save],[data-del],[data-photo],[data-ost],[data-purl]');
+  const t = e.target.closest('[data-adm],[data-edit],[data-save],[data-del],[data-photo],[data-ost],[data-purl],[data-backup]');
   if (!t) return;
   const d = t.dataset;
   if (d.adm) { admMode = d.adm; loadAdmin(); }
@@ -567,6 +567,10 @@ document.addEventListener('click', e => {
   else if (d.save !== undefined) saveProduct();
   else if (d.del) deleteProduct(+d.del);
   else if (d.photo) pickPhoto(+d.photo);
+  else if (d.backup !== undefined) {
+    toast('Собираю резервную копию…');
+    api('/admin/backup', {}, 1).then(() => toast('Готово — архив в чате с ботом 📦')).catch(err => toast(err.message));
+  }
   else if (d.purl) {
     const url = $('photoUrl').value.trim();
     api(`/admin/products/${d.purl}/photo-url`, { url }, 1)

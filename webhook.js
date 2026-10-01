@@ -15,6 +15,8 @@ const { getPayment } = require('./payments/yookassa');
 // так что файлы переживают редеплой (в отличие от остальной файловой системы)
 const dbDir = path.dirname(path.resolve(process.env.DB_PATH || 'shop.db'));
 const uploadsDir = path.join(dbDir, 'uploads');
+// Фото товаров, которые лежат в самом проекте (видно в VS Code и на GitHub)
+const photosDir = path.join(__dirname, 'photos');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
 const upload = multer({
@@ -35,7 +37,10 @@ const upload = multer({
 // ===== Все фото товаров храним у себя: папка uploads на постоянном диске Railway =====
 // Если у товара ссылка на чужой сайт — скачиваем картинку один раз и дальше показываем свою копию.
 const PUBLIC_BASE = process.env.PUBLIC_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
-const isLocalPhoto = (url) => /\/uploads\/[^/?#]+$/.test(String(url || '')) && fs.existsSync(path.join(uploadsDir, String(url).split('/uploads/')[1]));
+const isLocalPhoto = (url) => {
+  const m = String(url || '').match(/\/(uploads|photos)\/([^/?#]+)$/);
+  return Boolean(m) && fs.existsSync(path.join(m[1] === 'photos' ? photosDir : uploadsDir, m[2]));
+};
 
 async function localizePhoto(id, url) {
   if (!url || isLocalPhoto(url) || !/^https?:\/\//i.test(url) || !PUBLIC_BASE) return false;
@@ -74,6 +79,18 @@ function runOnce(key, fn) {
   if (fs.existsSync(mark)) return;
   try { fn(); fs.writeFileSync(mark, new Date().toISOString()); } catch (e) { console.error('Разовая правка не прошла:', key, e.message); }
 }
+// Фото из папки проекта photos/: файл «<id товара>-название.jpg» один раз ставится товару.
+// Если потом заменить фото в админке — новое фото не перезапишется при следующем запуске.
+if (fs.existsSync(photosDir) && PUBLIC_BASE) {
+  for (const file of fs.readdirSync(photosDir)) {
+    const m = file.match(/^(\d+)-[\w.-]+\.(jpe?g|png|webp)$/i);
+    if (!m) continue;
+    runOnce(`photo-${file}`, () => {
+      const r = db.prepare('UPDATE products SET photo_url = ? WHERE id = ?').run(`${PUBLIC_BASE}/photos/${file}`, parseInt(m[1], 10));
+      if (r.changes) console.log(`Фото из проекта: ${file}`);
+    });
+  }
+}
 runOnce('2026-10-01-catalog', () => {
   // убираем тестовый товар
   const test = db.prepare("SELECT id FROM products WHERE name = 'Радиатор Test' AND description = 'Тестовое описание'").get();
@@ -92,6 +109,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   app.set('trust proxy', true); // за прокси Railway — иначе req.protocol всегда 'http'
   app.use(express.json());
   app.use('/uploads', express.static(uploadsDir)); // без авторизации — Telegram должен уметь их скачать
+  app.use('/photos', express.static(photosDir, { maxAge: '7d' })); // фото из папки проекта
 
   // === Витрина (мини-приложение Telegram): /shop + /shop-api ===
   // Покупатель открывает /shop внутри Telegram. Каждый запрос подписан Telegram (initData) —
@@ -145,9 +163,10 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
     try {
       let hit = photoCache.get(req.params.id);
       if (!hit || hit.url !== p.photo_url) {
-        const local = p.photo_url.match(/\/uploads\/([^/?#]+)$/);
-        if (local && fs.existsSync(path.join(uploadsDir, local[1]))) {
-          return res.set('Cache-Control', 'public, max-age=86400').sendFile(path.join(uploadsDir, local[1]));
+        const local = p.photo_url.match(/\/(uploads|photos)\/([^/?#]+)$/);
+        const localPath = local && path.join(local[1] === 'photos' ? photosDir : uploadsDir, local[2]);
+        if (localPath && fs.existsSync(localPath)) {
+          return res.set('Cache-Control', 'public, max-age=86400').sendFile(localPath);
         }
         let url = p.photo_url;
         if (!/^https?:\/\//i.test(url)) url = await bot.telegram.getFileLink(url).then(String); // file_id из Telegram
@@ -320,6 +339,20 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
     localizeAllPhotos()
       .then(() => res.json({ ok: true, local: isLocalPhoto(db.prepare('SELECT photo_url FROM products WHERE id = ?').get(id).photo_url) }))
       .catch(() => res.json({ ok: true, local: false }));
+  });
+
+  // Резервная копия: бот присылает владелице ZIP в чат (каталог, заказы, промокоды, доставка, фото)
+  app.post('/shop-api/admin/backup', ...adm, async (req, res) => {
+    try {
+      const { makeBackup } = require('./backup');
+      const b = makeBackup({ uploadsDir, photosDir });
+      await bot.telegram.sendDocument(req.chatId, { source: b.buffer, filename: b.filename },
+        { caption: `📦 Резервная копия магазина\nФото: ${b.photos} · заказы и каталог — в Excel-файлах внутри.\nХраните у себя: там адреса покупателей.` });
+      res.json({ ok: true, size: b.buffer.length });
+    } catch (e) {
+      console.error('Резервная копия:', e.message);
+      res.status(500).json({ error: 'Не получилось собрать копию' });
+    }
   });
 
   app.get('/shop-api/admin/orders', ...adm, (req, res) => {
