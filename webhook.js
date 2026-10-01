@@ -7,6 +7,7 @@ const basicAuth = require('express-basic-auth');
 const db = require('./db');
 const { checkLowStock } = require('./notify');
 const { t } = require('./i18n');
+const crypto = require('crypto');
 const { getPayment } = require('./payments/yookassa');
 
 // фото товаров храним рядом с базой — на Railway это подключённый Volume,
@@ -30,11 +31,73 @@ const upload = multer({
   },
 });
 
-function startWebhookServer(bot) {
+function startWebhookServer(bot, { showCartFor } = {}) {
   const app = express();
   app.set('trust proxy', true); // за прокси Railway — иначе req.protocol всегда 'http'
   app.use(express.json());
   app.use('/uploads', express.static(uploadsDir)); // без авторизации — Telegram должен уметь их скачать
+
+  // === Витрина (мини-приложение Telegram): /shop + /shop-api ===
+  // Покупатель открывает /shop внутри Telegram. Каждый запрос подписан Telegram (initData) —
+  // проверяем подпись токеном бота, так что чужую корзину изменить нельзя.
+  app.use('/shop', express.static(path.join(__dirname, 'shop-public')));
+
+  function tgUser(req) {
+    const raw = req.get('X-Init-Data') || '';
+    const params = new URLSearchParams(raw);
+    const hash = params.get('hash');
+    if (!hash) return null;
+    params.delete('hash');
+    const data = [...params.entries()].map(([k, v]) => `${k}=${v}`).sort().join('\n');
+    const secret = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN).digest();
+    const check = crypto.createHmac('sha256', secret).update(data).digest('hex');
+    if (check.length !== hash.length || !crypto.timingSafeEqual(Buffer.from(check), Buffer.from(hash))) return null;
+    if (Date.now() / 1000 - Number(params.get('auth_date') || 0) > 86400) return null; // подпись старше суток
+    try { return JSON.parse(params.get('user')); } catch { return null; }
+  }
+  const shopAuth = (req, res, next) => {
+    const user = tgUser(req);
+    if (!user || !user.id) return res.status(401).json({ error: 'Откройте магазин из Telegram' });
+    req.chatId = user.id; // личный чат с ботом = id пользователя
+    next();
+  };
+  const cartMap = (chatId) =>
+    Object.fromEntries(db.prepare('SELECT product_id, quantity FROM cart_items WHERE chat_id = ?').all(chatId)
+      .map((r) => [r.product_id, r.quantity]));
+
+  app.get('/shop-api/catalog', shopAuth, (req, res) => {
+    const products = db
+      .prepare(`SELECT id, name, name_en, description, description_en, category, category_en, price, stock, photo_url
+                FROM products ORDER BY stock = 0, category, id`)
+      .all();
+    res.json({ lang: db.getLang(req.chatId), products, cart: cartMap(req.chatId) });
+  });
+
+  app.post('/shop-api/cart', shopAuth, (req, res) => {
+    const productId = parseInt(req.body.product_id, 10);
+    const qty = Math.max(0, parseInt(req.body.qty, 10) || 0);
+    const p = db.prepare('SELECT stock FROM products WHERE id = ?').get(productId);
+    if (!p) return res.status(404).json({ error: 'Товар не найден' });
+    if (qty > p.stock) return res.status(400).json({ error: 'Больше нет в наличии' });
+    if (qty === 0) {
+      db.prepare('DELETE FROM cart_items WHERE chat_id = ? AND product_id = ?').run(req.chatId, productId);
+    } else {
+      db.prepare(`INSERT INTO cart_items (chat_id, product_id, quantity) VALUES (?,?,?)
+                  ON CONFLICT(chat_id, product_id) DO UPDATE SET quantity = excluded.quantity`).run(req.chatId, productId, qty);
+    }
+    res.json({ ok: true, cart: cartMap(req.chatId) });
+  });
+
+  // «Оформить» в витрине → бот присылает корзину с кнопкой оформления в чат
+  app.post('/shop-api/checkout', shopAuth, async (req, res) => {
+    try {
+      if (showCartFor) await showCartFor(req.chatId);
+      res.json({ ok: true });
+    } catch (e) {
+      console.error('Витрина: не удалось отправить корзину', e.message);
+      res.status(500).json({ error: 'Не получилось, попробуйте ещё раз' });
+    }
+  });
 
   // === Вебхук ЮKassa (без авторизации — вызывается самой ЮKassa) ===
   app.post('/yookassa-webhook', async (req, res) => {

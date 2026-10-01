@@ -28,6 +28,8 @@ const STRINGS = {
     allCategories: 'Все',
     cartShort: (n) => `🛒 Корзина · ${n}`,
     noMoreStock: 'Больше нет в наличии',
+    openShopText: 'Весь каталог — в нашей витрине 👇',
+    openShopBtn: '🛍 Открыть витрину',
     pageNav: 'Листать:',
 
     categoriesPrompt: 'Выберите категорию:',
@@ -138,6 +140,8 @@ const STRINGS = {
     allCategories: 'All',
     cartShort: (n) => `🛒 Cart · ${n}`,
     noMoreStock: 'No more in stock',
+    openShopText: 'The whole catalog is in our shop 👇',
+    openShopBtn: '🛍 Open the shop',
     pageNav: 'Browse:',
 
     categoriesPrompt: 'Choose a category:',

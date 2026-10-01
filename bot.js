@@ -23,10 +23,17 @@ function formatPrice(kopecks) {
 // чтобы она не пропадала, даже если Telegram-клиент её случайно скрыл.
 // Покупатель может переключить язык интерфейса кнопкой "🌐 Язык / Language" —
 // эта кнопка и её обработчики распознают нажатие независимо от текущего языка.
+// Адрес витрины: SHOP_URL из переменных или публичный домен Railway (он задаётся автоматически)
+const SHOP_URL =
+  process.env.SHOP_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/shop/` : null);
+
 function buildMainMenu(lang) {
   // 3 ряда вместо 4 — меню ниже и не закрывает кнопки каталога
+  // «📦 Каталог» сразу открывает витрину (мини-приложение), если известен адрес сервера
+  const catalogBtn = SHOP_URL ? Markup.button.webApp(t(lang, 'btnCatalog'), SHOP_URL) : t(lang, 'btnCatalog');
   return Markup.keyboard([
-    [t(lang, 'btnCatalog'), t(lang, 'btnSearch'), t(lang, 'btnCart')],
+    [catalogBtn, t(lang, 'btnSearch'), t(lang, 'btnCart')],
     [t(lang, 'btnCategories'), t(lang, 'btnMyOrders'), t(lang, 'btnAiPick')],
     [t(lang, 'btnLanguage')],
   ]).resize();
@@ -63,7 +70,13 @@ bot.action(/^lang_(ru|en)$/, async (ctx) => {
   await ctx.reply(t(lang, 'languageSet'), buildMainMenu(lang));
 });
 
-bot.hears([t('ru', 'btnCatalog'), t('en', 'btnCatalog')], (ctx) => sendCarousel(ctx, -1, 0));
+bot.hears([t('ru', 'btnCatalog'), t('en', 'btnCatalog')], async (ctx) => {
+  if (!SHOP_URL) return sendCarousel(ctx, -1, 0);
+  // старая клавиатура без витрины — даём кнопку витрины и обновляем меню
+  const lang = db.getLang(ctx.chat.id);
+  await ctx.reply(t(lang, 'openShopText'), Markup.inlineKeyboard([Markup.button.webApp(t(lang, 'openShopBtn'), SHOP_URL)]));
+  await ctx.reply(t(lang, 'menuPrompt'), buildMainMenu(lang));
+});
 bot.command('catalog', (ctx) => sendCarousel(ctx, -1, 0));
 
 function escapeHtml(s) {
@@ -718,7 +731,11 @@ bot.launch();
 console.log('Бот запущен');
 
 const { startWebhookServer } = require('./webhook');
-startWebhookServer(bot);
+startWebhookServer(bot, {
+  // витрина просит показать корзину в чате — используем ту же функцию, что и кнопка «🛒 Корзина»
+  showCartFor: (chatId) =>
+    showCart({ chat: { id: chatId }, reply: (text, extra) => bot.telegram.sendMessage(chatId, text, extra) }),
+});
 
 // проверка низкого остатка раз в час
 setInterval(() => checkLowStock(bot), 1000 * 60 * 60);

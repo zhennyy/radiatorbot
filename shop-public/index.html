@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>RadiatorPro</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#f5f3f0; --card:#ffffff; --text:#1f2328; --muted:#7b8088; --line:#ebe7e2;
+    --accent:#e8590c; --accent-soft:#fff1e8; --ok:#2f9e44; --bad:#c92a2a; --photo:#ffffff;
+    --r:18px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --bg:#141518; --card:#1d1f23; --text:#f1f3f5; --muted:#9aa0a6; --line:#2b2e33;
+      --accent-soft:#3a2416; --photo:#25272b; }
+  }
+  :root[data-theme="dark"]{ --bg:#141518; --card:#1d1f23; --text:#f1f3f5; --muted:#9aa0a6; --line:#2b2e33;
+      --accent-soft:#3a2416; --photo:#25272b; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+  body{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  .wrap{max-width:760px;margin:0 auto;padding:0 16px}
+
+  header{padding:14px 0 8px}
+  .top{display:flex;align-items:center;gap:10px}
+  .logo{font-weight:800;font-size:22px;letter-spacing:-.3px;flex:1}
+  .logo span{color:var(--accent)}
+  .cartbtn{position:relative;width:44px;height:44px;border-radius:14px;border:1px solid var(--line);background:var(--card);
+    display:grid;place-items:center;font-size:20px;cursor:pointer;color:var(--text)}
+  .cartbtn b{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--accent);
+    color:#fff;font-size:12px;display:grid;place-items:center}
+  .cartbtn b:empty{display:none}
+  .search{margin-top:12px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:0 12px}
+  .search input{flex:1;border:0;outline:0;background:transparent;color:var(--text);font:inherit;padding:12px 0}
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+  .chip.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding-top:6px}
+  @media (min-width:640px){ .grid{grid-template-columns:repeat(3,minmax(0,1fr))} }
+  .card{background:var(--card);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;
+    box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 18px rgba(0,0,0,.04);cursor:pointer}
+  .ph{aspect-ratio:1/1;background:var(--photo);display:grid;place-items:center;position:relative;border-bottom:1px solid var(--line)}
+  .ph img{width:100%;height:100%;object-fit:contain;padding:10px}
+  .ph .noimg{font-size:42px;opacity:.35}
+  .tag{position:absolute;left:8px;top:8px;font-size:11px;font-weight:600;padding:4px 8px;border-radius:8px;background:var(--card);color:var(--muted)}
+  .tag.low{color:var(--accent)} .tag.out{color:var(--bad)}
+  .card.out .ph img{filter:grayscale(1);opacity:.5}
+  .info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .cat{font-size:12px;color:var(--muted)}
+  .name{font-weight:600;font-size:14.5px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto}
+  .price{font-weight:800;font-size:17px;white-space:nowrap}
+  .add{width:36px;height:36px;border-radius:12px;border:0;background:var(--accent);color:#fff;font-size:22px;line-height:1;cursor:pointer;flex:none}
+  .add:disabled{background:var(--line);color:var(--muted)}
+  .step{display:flex;align-items:center;background:var(--accent-soft);border-radius:12px;height:36px}
+  .step button{width:32px;height:36px;border:0;background:transparent;color:var(--accent);font-size:20px;cursor:pointer}
+  .step span{min-width:18px;text-align:center;font-weight:700;color:var(--accent)}
+  .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:48px 0}
+
+  /* нижняя панель корзины (если нет кнопки Telegram) */
+  .bar{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg) 30%);z-index:6;display:none}
+  .bar button{width:100%;max-width:728px;display:block;margin:0 auto;border:0;border-radius:16px;background:var(--accent);color:#fff;font:inherit;font-weight:700;font-size:16px;padding:16px;cursor:pointer}
+  body.cart-on .bar{display:block}
+  body.in-tg .bar{display:none!important}
+
+  /* карточка товара снизу */
+  .veil{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.2s;z-index:10}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;background:var(--card);border-radius:24px 24px 0 0;
+    transform:translateY(100%);transition:transform .25s ease;z-index:11;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+  .open .veil{opacity:1;pointer-events:auto} .open .sheet{transform:none}
+  .sheet .big{aspect-ratio:4/3;background:var(--photo);display:grid;place-items:center}
+  .sheet .big img{width:100%;height:100%;object-fit:contain;padding:16px}
+  .sheet .body{padding:16px 20px 0;max-width:760px;margin:0 auto}
+  .sheet h2{margin:4px 0 8px;font-size:21px;line-height:1.25}
+  .sheet p{margin:0 0 14px;color:var(--muted)}
+  .sheet .stock{font-size:14px;font-weight:600;margin-bottom:16px}
+  .sheet .act{display:flex;align-items:center;gap:12px}
+  .sheet .act .price{font-size:24px;flex:1}
+  .sheet .act .add{width:auto;padding:0 20px;height:48px;font-size:16px;font-weight:700;border-radius:14px}
+  .sheet .act .step{height:48px;border-radius:14px}
+  .sheet .act .step button{width:44px;height:48px;font-size:24px}
+  .x{position:absolute;right:14px;top:14px;width:34px;height:34px;border-radius:50%;border:0;background:rgba(0,0,0,.06);font-size:16px;cursor:pointer;color:var(--text)}
+  .toast{position:fixed;left:50%;top:16px;transform:translate(-50%,-80px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;transition:.25s;z-index:20}
+  .toast.on{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div class="logo">Radiator<span>Pro</span> 🔥</div>
+      <button class="cartbtn" id="cartBtn" aria-label="Корзина">🛒<b id="cartCount"></b></button>
+    </div>
+    <label class="search">🔍<input id="q" type="search" placeholder="Поиск радиаторов" autocomplete="off"></label>
+    <div class="chips" id="chips"></div>
+  </header>
+  <main class="grid" id="grid"></main>
+</div>
+<div class="bar"><button id="barBtn"></button></div>
+<div class="veil" id="veil"></div>
+<section class="sheet" id="sheet"></section>
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+const inTg = Boolean(tg && tg.initData);
+if (tg) { tg.ready(); tg.expand(); document.documentElement.dataset.theme = tg.colorScheme === 'dark' ? 'dark' : 'light'; }
+if (inTg) document.body.classList.add('in-tg');
+
+const T = {
+  ru: { all: 'Все', search: 'Поиск радиаторов', inStock: n => `В наличии ${n} шт.`, low: n => `Осталось ${n}`, out: 'Нет в наличии',
+        empty: 'Ничего не нашлось 🙈', checkout: (n, s) => `Оформить · ${s}`, added: 'Добавлено в корзину', noMore: 'Больше нет в наличии',
+        addBtn: 'В корзину', err: 'Не получилось загрузить каталог. Закройте и откройте снова.', cartEmpty: 'Корзина пока пуста' },
+  en: { all: 'All', search: 'Search radiators', inStock: n => `In stock: ${n}`, low: n => `Only ${n} left`, out: 'Out of stock',
+        empty: 'Nothing found 🙈', checkout: (n, s) => `Checkout · ${s}`, added: 'Added to cart', noMore: 'No more in stock',
+        addBtn: 'Add to cart', err: 'Could not load the catalog. Close and reopen it.', cartEmpty: 'Your cart is empty' },
+};
+let L = T.ru, lang = 'ru';
+let products = [], cart = {}, cat = null, query = '';
+
+const $ = id => document.getElementById(id);
+const rub = k => Math.round(k / 100).toLocaleString('ru-RU') + ' ₽';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const nm = p => (lang === 'en' && p.name_en) || p.name;
+const ds = p => (lang === 'en' && p.description_en) || p.description || '';
+const ct = p => (lang === 'en' && p.category_en) || p.category || '';
+
+async function api(path, body) {
+  const r = await fetch('/shop-api' + path, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json', 'X-Init-Data': tg?.initData || '' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'Ошибка');
+  return d;
+}
+
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 1400); }
+function haptic(kind) { try { tg?.HapticFeedback?.impactOccurred(kind || 'light'); } catch {} }
+
+function renderChips() {
+  const cats = [...new Map(products.filter(p => p.category).map(p => [p.category, ct(p)])).entries()];
+  $('chips').innerHTML = [`<button class="chip ${cat === null ? 'on' : ''}" data-c="">${L.all}</button>`]
+    .concat(cats.map(([k, v]) => `<button class="chip ${cat === k ? 'on' : ''}" data-c="${esc(k)}">${esc(v)}</button>`)).join('');
+}
+
+function stockTag(p) {
+  if (p.stock <= 0) return `<span class="tag out">${L.out}</span>`;
+  if (p.stock <= 3) return `<span class="tag low">${L.low(p.stock)}</span>`;
+  return '';
+}
+function ctrl(p) {
+  const q = cart[p.id] || 0;
+  if (p.stock <= 0) return `<button class="add" disabled>+</button>`;
+  if (!q) return `<button class="add" data-add="${p.id}" aria-label="${L.addBtn}">+</button>`;
+  return `<div class="step"><button data-dec="${p.id}">−</button><span>${q}</span><button data-add="${p.id}">+</button></div>`;
+}
+function photo(p, cls = '') {
+  return p.photo_url ? `<img src="${esc(p.photo_url)}" alt="" loading="lazy" ${cls}>` : `<div class="noimg">♨️</div>`;
+}
+
+function renderGrid() {
+  const q = query.trim().toLowerCase();
+  const list = products.filter(p => (!cat || p.category === cat) &&
+    (!q || [p.name, p.name_en, p.description, p.category].join(' ').toLowerCase().includes(q)));
+  $('grid').innerHTML = list.length ? list.map(p => `
+    <article class="card ${p.stock <= 0 ? 'out' : ''}" data-open="${p.id}">
+      <div class="ph">${photo(p)}${stockTag(p)}</div>
+      <div class="info">
+        ${ct(p) ? `<div class="cat">${esc(ct(p))}</div>` : ''}
+        <div class="name">${esc(nm(p))}</div>
+        <div class="row"><div class="price">${rub(p.price)}</div><div data-ctrl="${p.id}">${ctrl(p)}</div></div>
+      </div>
+    </article>`).join('') : `<div class="empty">${L.empty}</div>`;
+}
+
+function cartTotals() {
+  let n = 0, sum = 0;
+  for (const [id, q] of Object.entries(cart)) { const p = products.find(x => x.id == id); if (p) { n += q; sum += q * p.price; } }
+  return { n, sum };
+}
+function renderCart() {
+  const { n, sum } = cartTotals();
+  $('cartCount').textContent = n || '';
+  document.body.classList.toggle('cart-on', n > 0);
+  $('barBtn').textContent = L.checkout(n, rub(sum));
+  if (tg?.MainButton && inTg) {
+    if (n > 0) { tg.MainButton.setParams({ text: L.checkout(n, rub(sum)), color: '#e8590c', text_color: '#ffffff' }); tg.MainButton.show(); }
+    else tg.MainButton.hide();
+  }
+}
+function refresh(id) {
+  document.querySelectorAll(`[data-ctrl="${id}"]`).forEach(el => { const p = products.find(x => x.id == id); el.innerHTML = ctrl(p); });
+  if (openId == id) renderSheet();
+  renderCart();
+}
+
+async function change(id, delta) {
+  const p = products.find(x => x.id == id); if (!p) return;
+  const q = Math.max(0, (cart[id] || 0) + delta);
+  if (q > p.stock) { toast(L.noMore); return; }
+  const prev = cart[id] || 0;
+  if (q) cart[id] = q; else delete cart[id];
+  haptic(delta > 0 ? 'medium' : 'light');
+  refresh(id);
+  try { await api('/cart', { product_id: id, qty: q }); }
+  catch (e) { if (prev) cart[id] = prev; else delete cart[id]; refresh(id); toast(e.message); }
+}
+
+let openId = null;
+function renderSheet() {
+  const p = products.find(x => x.id == openId); if (!p) return;
+  const stock = p.stock > 0 ? `<div class="stock" style="color:var(--ok)">✓ ${L.inStock(p.stock)}</div>` : `<div class="stock" style="color:var(--bad)">${L.out}</div>`;
+  const q = cart[p.id] || 0;
+  const act = p.stock <= 0 ? '' : q
+    ? `<div class="step"><button data-dec="${p.id}">−</button><span>${q}</span><button data-add="${p.id}">+</button></div>`
+    : `<button class="add" data-add="${p.id}">${L.addBtn}</button>`;
+  $('sheet').innerHTML = `<button class="x" data-close>✕</button>
+    <div class="big">${photo(p)}</div>
+    <div class="body">
+      ${ct(p) ? `<div class="cat">${esc(ct(p))}</div>` : ''}
+      <h2>${esc(nm(p))}</h2>
+      ${ds(p) ? `<p>${esc(ds(p))}</p>` : ''}
+      ${stock}
+      <div class="act"><div class="price">${rub(p.price)}</div>${act}</div>
+    </div>`;
+}
+function openSheet(id) { openId = id; renderSheet(); document.body.classList.add('open'); tg?.BackButton?.show(); }
+function closeSheet() { openId = null; document.body.classList.remove('open'); tg?.BackButton?.hide(); }
+
+async function checkout() {
+  if (!cartTotals().n) { toast(L.cartEmpty); return; }
+  try {
+    tg?.MainButton?.showProgress?.();
+    await api('/checkout', {});
+    if (inTg) tg.close(); else toast('✓');
+  } catch (e) { toast(e.message); } finally { tg?.MainButton?.hideProgress?.(); }
+}
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-add],[data-dec],[data-open],[data-close],[data-c]');
+  if (!t) return;
+  if (t.dataset.add) { e.stopPropagation(); change(+t.dataset.add, 1); }
+  else if (t.dataset.dec) { e.stopPropagation(); change(+t.dataset.dec, -1); }
+  else if (t.dataset.c !== undefined) { cat = t.dataset.c || null; renderChips(); renderGrid(); }
+  else if (t.dataset.close !== undefined) closeSheet();
+  else if (t.dataset.open) openSheet(+t.dataset.open);
+});
+$('veil').onclick = closeSheet;
+$('q').oninput = e => { query = e.target.value; renderGrid(); };
+$('cartBtn').onclick = checkout;
+$('barBtn').onclick = checkout;
+tg?.MainButton?.onClick(checkout);
+tg?.BackButton?.onClick(closeSheet);
+
+(async () => {
+  try {
+    const d = await api('/catalog');
+    lang = d.lang === 'en' ? 'en' : 'ru'; L = T[lang];
+    $('q').placeholder = L.search;
+    products = d.products; cart = d.cart || {};
+    renderChips(); renderGrid(); renderCart();
+  } catch (e) { $('grid').innerHTML = `<div class="empty">${L.err}</div>`; }
+})();
+</script>
+</body>
+</html>
