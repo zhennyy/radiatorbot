@@ -16,7 +16,7 @@ async function createPayment(orderId, amountRub, description) {
       confirmation: { type: 'redirect', return_url: `https://t.me/${process.env.BOT_USERNAME}` },
       capture: true,
       description,
-      metadata: { order_id: orderId },
+      metadata: { order_id: orderId, app: 'radiatorbot' },
     },
     { auth, headers: { 'Idempotence-Key': idempotenceKey } }
   );

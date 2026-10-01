@@ -7,6 +7,7 @@ const basicAuth = require('express-basic-auth');
 const db = require('./db');
 const { checkLowStock } = require('./notify');
 const { t } = require('./i18n');
+const { getPayment } = require('./payments/yookassa');
 
 // фото товаров храним рядом с базой — на Railway это подключённый Volume,
 // так что файлы переживают редеплой (в отличие от остальной файловой системы)
@@ -39,10 +40,29 @@ function startWebhookServer(bot) {
   app.post('/yookassa-webhook', async (req, res) => {
     const event = req.body;
 
-    if (event.event === 'payment.succeeded') {
-      const orderId = parseInt(event.object.metadata.order_id, 10);
+    if (event && event.event === 'payment.succeeded' && event.object && event.object.id) {
+      // Не верим уведомлению «на слово»: переспрашиваем платёж у самой ЮKassa.
+      // Иначе кто угодно мог бы отправить сюда поддельный «оплачено».
+      let payment;
+      try {
+        payment = await getPayment(event.object.id);
+      } catch (e) {
+        console.error('ЮKassa: не удалось проверить платёж', e.message);
+        return res.sendStatus(500); // ЮKassa повторит уведомление позже
+      }
+      if (payment.status !== 'succeeded') return res.sendStatus(200);
+      // Платёж другого бота (тот же магазин ЮKassa, например «Флёр») — не наш, пропускаем
+      const app = payment.metadata && payment.metadata.app;
+      if (app && app !== 'radiatorbot') return res.sendStatus(200);
+
+      const orderId = parseInt(payment.metadata && payment.metadata.order_id, 10);
       const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
       if (!order || order.status === 'paid') return res.sendStatus(200); // защита от дублей
+      // Сумма платежа должна совпасть с суммой заказа (в копейках)
+      if (Math.round(parseFloat(payment.amount.value) * 100) !== order.total) {
+        console.warn(`ЮKassa: сумма платежа ${payment.amount.value} не совпадает с заказом #${orderId}`);
+        return res.sendStatus(200);
+      }
 
       db.prepare("UPDATE orders SET status = 'paid' WHERE id = ?").run(orderId);
 
