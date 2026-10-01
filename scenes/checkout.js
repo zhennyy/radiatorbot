@@ -117,6 +117,7 @@ const checkoutScene = new Scenes.WizardScene(
       ctx.wizard.state.discountPercent = discountPercent;
       ctx.wizard.state.discountedTotal = discountedTotal;
       ctx.wizard.state.grandTotal = grandTotal;
+      ctx.wizard.state.itemsTotal = total; // запоминаем сумму товаров — перед оплатой сверим с корзиной
 
       const { items } = getCart(ctx.chat.id);
       const buyerName = db.getName(ctx.chat.id);
@@ -206,7 +207,22 @@ checkoutScene.action('pay_yookassa', async (ctx) => {
   const discountPercent = ctx.wizard.state.discountPercent || 0;
   const deliveryCity = ctx.wizard.state.deliveryCity || null;
   const deliveryCost = ctx.wizard.state.deliveryCost || 0;
-  const finalTotal = ctx.wizard.state.grandTotal;
+  // Защита: пока покупатель шёл по шагам, корзину могли изменить (например, в витрине).
+  // Пересчитываем сумму по текущей корзине и сверяем — иначе можно было бы оплатить
+  // старую, меньшую сумму за большее количество товаров.
+  const { items: nowItems, total: nowTotal } = getCart(ctx.chat.id);
+  if (!nowItems.length || nowTotal !== ctx.wizard.state.itemsTotal) {
+    await ctx.scene.leave();
+    return ctx.reply(t(lang, 'cartChanged'));
+  }
+  for (const i of nowItems) {
+    if (i.stock < i.quantity) {
+      await ctx.scene.leave();
+      return ctx.reply(t(lang, 'insufficientStock', (lang === 'en' && i.name_en) || i.name, i.stock));
+    }
+  }
+  const finalTotal =
+    (discountPercent > 0 ? Math.round((nowTotal * (100 - discountPercent)) / 100) : nowTotal) + deliveryCost;
 
   const orderId = createPendingOrder(
     ctx.chat.id,

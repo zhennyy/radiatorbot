@@ -41,7 +41,9 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   // === Витрина (мини-приложение Telegram): /shop + /shop-api ===
   // Покупатель открывает /shop внутри Telegram. Каждый запрос подписан Telegram (initData) —
   // проверяем подпись токеном бота, так что чужую корзину изменить нельзя.
-  app.use('/shop', express.static(path.join(__dirname, 'shop-public')));
+  app.use('/shop', express.static(path.join(__dirname, 'shop-public'), {
+    setHeaders: (res) => res.set('Cache-Control', 'no-cache'), // Telegram не держит старую версию витрины
+  }));
 
   function tgUser(req) {
     const raw = req.get('X-Init-Data') || '';
@@ -251,6 +253,17 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
     res.json({ ok: true });
   });
 
+  // Фото по ссылке (https), например из генератора картинок — сервер сам скачает и покажет
+  app.post('/shop-api/admin/products/:id/photo-url', ...adm, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const url = String(req.body.url || '').trim();
+    if (!/^https:\/\/[^\s]+$/i.test(url) || url.length > 1000) return res.status(400).json({ error: 'Нужна ссылка, начинающаяся с https://' });
+    const r = db.prepare('UPDATE products SET photo_url = ? WHERE id = ?').run(url, id);
+    if (!r.changes) return res.status(404).json({ error: 'Товар не найден' });
+    photoCache.delete(String(id));
+    res.json({ ok: true });
+  });
+
   app.get('/shop-api/admin/orders', ...adm, (req, res) => {
     const itemsStmt = db.prepare(`SELECT oi.quantity, oi.price, p.name FROM order_items oi
                                   LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`);
@@ -322,7 +335,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
         .prepare('SELECT * FROM order_items WHERE order_id = ?')
         .all(orderId);
       for (const i of orderItems) {
-        db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(
+        db.prepare('UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?').run(
           i.quantity,
           i.product_id
         );

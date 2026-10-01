@@ -552,7 +552,7 @@ async function showMyOrders(ctx) {
       text += `${t(lang, 'pickupLine')}\n`;
     }
     text += `${t(lang, 'sumLabel')} <b>${formatPrice(o.total)}</b>\n`;
-    text += `${t(lang, 'addressLabel')} ${o.address || '—'}\n`;
+    text += `${t(lang, 'addressLabel')} ${escapeHtml(o.address || '—')}\n`;
     text += `🕐 ${date}`;
 
     await ctx.reply(text, { parse_mode: 'HTML' });
@@ -603,7 +603,7 @@ bot.command('orders', isOwner, async (ctx) => {
       text += `🚚 Самовывоз\n`;
     }
     text += `💰 Сумма: <b>${formatPrice(o.total)}</b>\n`;
-    text += `📍 ${o.address || '—'}\n`;
+    text += `📍 ${escapeHtml(o.address || "—")}\n`;
     text += `🕐 ${date}`;
 
     await ctx.reply(text, { parse_mode: 'HTML' });
@@ -735,6 +735,10 @@ bot.command('markshipped', isOwner, (ctx) => {
   }
   ctx.reply(`Заказ #${orderId} помечен как отправленный.`);
 });
+
+// Ошибка в одном обработчике не должна ронять бота целиком
+bot.catch((err, ctx) => console.error('Ошибка бота:', ctx?.updateType, err?.message || err));
+process.on('unhandledRejection', (e) => console.error('Необработанная ошибка:', e?.message || e));
 
 bot.launch();
 console.log('Бот запущен');

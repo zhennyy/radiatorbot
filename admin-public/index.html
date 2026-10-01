@@ -262,6 +262,9 @@
 </div>
 
 <script>
+// экранирование текста, который ввели покупатели (адрес, город), — защита от подстановки кода в админку
+const escH = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 // === Двуязычный интерфейс админки (RU/EN) ===
 // Тексты интерфейса переключаются кнопкой RU/EN сверху; выбор хранится в localStorage
 // этого браузера (не синхронизируется между устройствами — это локальная настройка панели).
@@ -633,7 +636,7 @@ async function loadOrders() {
         <td><span class="status-pill status-${st}">${label}</span></td>
         <td>${money(o.total)}</td>
         <td>${o.items.map(i => `${(ADMIN_LANG === 'en' && i.name_en) || i.name} ×${i.quantity}`).join(', ')}</td>
-        <td>${o.address || '—'}</td>
+        <td>${escH(o.address || '—')}</td>
         <td class="row-actions" onclick="event.stopPropagation()">
           <button onclick="setStatus(${o.id}, 'shipped')">${a('btnShipped')}</button>
           <button onclick="setStatus(${o.id}, 'delivered')">${a('btnDelivered')}</button>
@@ -680,10 +683,10 @@ async function openOrderDetail(id) {
     <div class="om-row"><span class="om-label">${a('thStatus')}</span><span class="status-pill status-${st}">${label}</span></div>
     <div class="om-items">${itemsHtml || `<div>${a('noItems')}</div>`}</div>
     <div class="om-row"><span class="om-label">${a('itemsSum')}</span><span>${money(o.total - (o.delivery_cost || 0))}</span></div>
-    ${o.delivery_cost ? `<div class="om-row"><span class="om-label">${a('delivery')}${o.delivery_city ? ' (' + ((ADMIN_LANG === 'en' && o.delivery_city_en) || o.delivery_city) + ')' : ''}</span><span>${money(o.delivery_cost)}</span></div>` : ''}
+    ${o.delivery_cost ? `<div class="om-row"><span class="om-label">${a('delivery')}${o.delivery_city ? ' (' + escH((ADMIN_LANG === 'en' && o.delivery_city_en) || o.delivery_city) + ')' : ''}</span><span>${money(o.delivery_cost)}</span></div>` : ''}
     <div class="om-row"><span class="om-label">${a('total')}</span><span><b>${money(o.total)}</b></span></div>
-    ${o.promo_code ? `<div class="om-row"><span class="om-label">${a('promoCode')}</span><span>${o.promo_code} (−${o.discount_percent}%)</span></div>` : ''}
-    <div class="om-row"><span class="om-label">${a('thAddress')}</span><span>${o.address || '—'}</span></div>
+    ${o.promo_code ? `<div class="om-row"><span class="om-label">${a('promoCode')}</span><span>${escH(o.promo_code)} (−${o.discount_percent}%)</span></div>` : ''}
+    <div class="om-row"><span class="om-label">${a('thAddress')}</span><span>${escH(o.address || '—')}</span></div>
     <div class="om-row"><span class="om-label">${a('payment')}</span><span>${o.payment_provider || '—'}</span></div>
     <div class="om-row"><span class="om-label">Chat ID</span><span>${o.chat_id}</span></div>
     <div class="om-actions">

@@ -474,6 +474,7 @@ function openEditor(id) {
     ${id === 'new' ? '' : `<div class="big photoEdit">${photo(p)}<button class="up" data-photo="${p.id}">📷 ${p.has_photo ? 'Заменить фото' : 'Добавить фото'}</button></div>`}
     <form class="body form" id="pform" onsubmit="return false">
       <h2>${id === 'new' ? 'Новый товар' : 'Редактирование'}</h2>
+      ${id === 'new' ? '' : `<details><summary>Фото по ссылке</summary><div style="display:flex;gap:8px;margin-top:8px"><input id="photoUrl" placeholder="https://…" inputmode="url"><button class="btn" style="width:auto;padding:0 16px" data-purl="${p.id}">OK</button></div></details>`}
       ${f('name', 'Название')}
       <div class="two"><div>${f('price', 'Цена, ₽', 'number', 'inputmode="numeric" min="1"')}</div><div>${f('stock', 'Остаток, шт.', 'number', 'inputmode="numeric" min="0"')}</div></div>
       ${f('category', 'Категория', 'text', 'list="cats"')}
@@ -543,7 +544,7 @@ async function reloadAll() {
   if (tab === 'admin' && admMode === 'products') renderAdmProducts();
 }
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-adm],[data-edit],[data-save],[data-del],[data-photo],[data-ost]');
+  const t = e.target.closest('[data-adm],[data-edit],[data-save],[data-del],[data-photo],[data-ost],[data-purl]');
   if (!t) return;
   const d = t.dataset;
   if (d.adm) { admMode = d.adm; loadAdmin(); }
@@ -551,6 +552,12 @@ document.addEventListener('click', e => {
   else if (d.save !== undefined) saveProduct();
   else if (d.del) deleteProduct(+d.del);
   else if (d.photo) pickPhoto(+d.photo);
+  else if (d.purl) {
+    const url = $('photoUrl').value.trim();
+    api(`/admin/products/${d.purl}/photo-url`, { url }, 1)
+      .then(async () => { toast('Фото обновлено ✓'); await reloadAll(); openEditor(+d.purl); })
+      .catch(err => toast(err.message));
+  }
   else if (d.ost) { const [id, st] = d.ost.split(':'); setOrderStatus(+id, st); }
 });
 
