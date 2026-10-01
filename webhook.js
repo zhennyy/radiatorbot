@@ -369,7 +369,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       id: o.id, code: o.order_code || String(o.id), status: String(o.status || '').split(':')[0],
       total: o.total, delivery_cost: o.delivery_cost || 0, created_at: o.created_at,
       address: String(o.address || '').replace(/ · тел\..*$/, ''), phone: orders.phoneOf(o),
-      pickup: !o.delivery_city, track: o.track || '', rating: o.rating || 0,
+      pickup: !o.delivery_city, track: o.track || '', rating: o.rating || 0, was_paid: Boolean(o.paid_at),
       promo: o.promo_code || '', discount: o.discount_percent || 0,
       buyer: db.getName(o.chat_id) || '', chat_id: o.chat_id,
       items: itemsStmt.all(o.id).map((i) => ({ name: i.name || '—', qty: i.quantity, price: i.price })),
@@ -392,7 +392,8 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
 
   // ===== Оформление и оплата прямо в витрине =====
   // Всё считаем на сервере: цены — из базы, доставка — из тарифов, скидка — из промокода.
-  const { createPendingOrder, getDeliveryPrice } = require('./scenes/checkout');
+  const { createPendingOrder } = require('./scenes/checkout');
+  const pricing = require('./pricing');
   const { getCart } = require('./cart');
 
   app.get('/shop-api/checkout-info', shopAuth, (req, res) => {
@@ -402,14 +403,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       payOnline: Boolean(process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY) });
   });
 
-  function findPromo(code) {
-    code = String(code || '').trim().slice(0, 40);
-    if (!code) return { percent: 0, code: null };
-    const p = db.prepare('SELECT * FROM promo_codes WHERE code = ? COLLATE NOCASE AND active = 1').get(code);
-    if (!p) throw new Error('Такого промокода нет');
-    if (p.max_uses !== null && p.used_count >= p.max_uses) throw new Error('Промокод уже закончился');
-    return { percent: p.discount_percent, code: p.code };
-  }
+  const findPromo = pricing.findPromo;
   app.post('/shop-api/promo', shopAuth, (req, res) => {
     try { res.json({ ok: true, ...findPromo(req.body.code) }); } catch (e) { res.status(400).json({ error: e.message }); }
   });
@@ -438,26 +432,26 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
         const city = String(b.city || '').trim().slice(0, 80);
         if (!city) return res.status(400).json({ error: 'Выберите город' });
         if (addr.length < 5) return res.status(400).json({ error: 'Укажите адрес: улица, дом, квартира' });
-        deliveryCity = city;
-        deliveryCost = getDeliveryPrice(city);
-        address = `${city}, ${addr}`;
+        const known = pricing.findCity(city);
+        deliveryCity = known ? known.city : city;
+        address = `${deliveryCity}, ${addr}`;
       }
       const phone = String(b.phone || '').trim().slice(0, 30);
       if (phone && phone.replace(/\D/g, '').length < 10) return res.status(400).json({ error: 'Проверьте номер телефона' });
       if (phone) address += ` · тел. ${phone}`;
       let promo;
       try { promo = findPromo(b.promo); } catch (e) { return res.status(400).json({ error: e.message }); }
-      const discounted = promo.percent > 0 ? Math.round((total * (100 - promo.percent)) / 100) : total;
-      if (ds.freeFrom > 0 && discounted >= ds.freeFrom) deliveryCost = 0; // бесплатная доставка от суммы
-      const finalTotal = discounted + deliveryCost;
+      const q = pricing.quote(total, promo.percent, deliveryCity); // доставка, «бесплатно от», скидка
+      deliveryCost = q.delivery;
+      const finalTotal = q.total;
 
       const orderId = createPendingOrder(chatId, address, 'yookassa', finalTotal, promo.code, promo.percent, deliveryCity, deliveryCost);
-      if (promo.code) db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE code = ?').run(promo.code);
       const code = db.prepare('SELECT order_code FROM orders WHERE id = ?').get(orderId).order_code || String(orderId);
 
       const { createPayment } = require('./payments/yookassa');
       const payment = await createPayment(orderId, finalTotal / 100, `Заказ #${code}`);
-      db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(`awaiting_payment:${payment.id}`, orderId);
+      db.prepare('UPDATE orders SET status = ?, payment_id = ? WHERE id = ?').run(`awaiting_payment:${payment.id}`, payment.id, orderId);
+      db.prepare('DELETE FROM cart_items WHERE chat_id = ?').run(chatId); // корзина превратилась в заказ
       const url = payment.confirmation.confirmation_url;
       // ссылка на оплату — ещё и в чат, чтобы не потерялась
       bot.telegram.sendMessage(chatId, t(lang, 'payLinkText', code), {
@@ -513,6 +507,8 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       // Платёж другого бота (тот же магазин ЮKassa, например «Флёр») — не наш, пропускаем
       const app = payment.metadata && payment.metadata.app;
       if (app && app !== 'radiatorbot') return res.sendStatus(200);
+      // Деньги уже (частично) вернули — повтор уведомления заказ не «оживляет»
+      if (parseFloat(payment.refunded_amount?.value || 0) > 0) return res.sendStatus(200);
 
       const orderId = parseInt(payment.metadata && payment.metadata.order_id, 10);
       const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
@@ -524,7 +520,8 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       }
 
       try {
-        await orders.markPaid(bot, orderId); // статус, склад, корзина, сообщения покупателю и владелице
+        // статус, склад, промокод, сообщения покупателю и владелице; чужой/повторный платёж не засчитается
+        if (!(await orders.markPaid(bot, orderId, payment.id))) console.warn(`ЮKassa: платёж ${payment.id} не засчитан заказу #${orderId} (повтор или чужой)`);
         checkLowStock(bot);
       } catch (e) {
         console.error('ЮKassa: оплата получена, но обработка заказа упала', e.message);
@@ -692,7 +689,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   };
 
   // заказы, которые реально принесли деньги (не pending/ожидание оплаты/отменённые)
-  const PAID_STATUSES = ['paid', 'shipped', 'delivered'];
+  const PAID_STATUSES = ['paid', 'assembling', 'shipped', 'delivered'];
 
   app.get('/api/analytics', (req, res) => {
     const placeholders = PAID_STATUSES.map(() => '?').join(',');

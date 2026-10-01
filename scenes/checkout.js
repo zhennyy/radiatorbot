@@ -6,12 +6,8 @@ const { t } = require('../i18n');
 
 // ищем тариф доставки по городу (без учёта регистра); если города нет в списке —
 // используем дефолтный тариф на "остальную Россию"
-function getDeliveryPrice(city) {
-  const rate = db
-    .prepare('SELECT price FROM delivery_rates WHERE city = ? COLLATE NOCASE AND active = 1')
-    .get(city);
-  return rate ? rate.price : db.DEFAULT_DELIVERY_PRICE;
-}
+const pricing = require('../pricing');
+const getDeliveryPrice = (city) => pricing.deliveryPrice(city);
 
 function buildCityKeyboard(cityOptions, lang) {
   const cityButtons = cityOptions.map((opt, i) =>
@@ -22,7 +18,7 @@ function buildCityKeyboard(cityOptions, lang) {
     rows.push(cityButtons.slice(i, i + 2));
   }
   rows.push([Markup.button.callback(t(lang, 'cityOtherButton'), 'deliv_other')]);
-  rows.push([Markup.button.callback(t(lang, 'pickupButton'), 'deliv_pickup')]);
+  if (db.getDeliverySettings().pickup) rows.push([Markup.button.callback(t(lang, 'pickupButton'), 'deliv_pickup')]);
   return Markup.inlineKeyboard(rows);
 }
 
@@ -71,7 +67,8 @@ const checkoutScene = new Scenes.WizardScene(
 
     if (ctx.wizard.state.awaitingCustomCityName) {
       ctx.wizard.state.awaitingCustomCityName = false;
-      ctx.wizard.state.deliveryCity = text;
+      const known = pricing.findCity(text);
+      ctx.wizard.state.deliveryCity = known ? known.city : text.slice(0, 80);
       ctx.wizard.state.deliveryCost = getDeliveryPrice(text);
       await ctx.reply(t(lang, 'enterExactAddress'));
       return;
@@ -95,23 +92,21 @@ const checkoutScene = new Scenes.WizardScene(
       let promoCode = null;
 
       if (input && input !== '-') {
-        const promo = db
-          .prepare('SELECT * FROM promo_codes WHERE code = ? COLLATE NOCASE AND active = 1')
-          .get(input);
-        if (!promo) {
-          await ctx.reply(t(lang, 'promoNotFound'));
-        } else if (promo.max_uses !== null && promo.used_count >= promo.max_uses) {
-          await ctx.reply(t(lang, 'promoExhausted'));
-        } else {
-          discountPercent = promo.discount_percent;
+        try {
+          const promo = pricing.findPromo(input);
+          discountPercent = promo.percent;
           promoCode = promo.code;
+        } catch (e) {
+          await ctx.reply(t(lang, e.kind === 'exhausted' ? 'promoExhausted' : 'promoNotFound'));
         }
       }
 
-      const discountedTotal =
-        discountPercent > 0 ? Math.round((total * (100 - discountPercent)) / 100) : total;
-      const deliveryCost = ctx.wizard.state.deliveryCost || 0;
-      const grandTotal = discountedTotal + deliveryCost;
+      // те же правила, что в витрине: скидка, тариф города, «бесплатно от суммы»
+      const q = pricing.quote(total, discountPercent, ctx.wizard.state.deliveryCity ?? null);
+      const discountedTotal = q.goods;
+      const deliveryCost = q.delivery;
+      ctx.wizard.state.deliveryCost = deliveryCost;
+      const grandTotal = q.total;
 
       ctx.wizard.state.promoCode = promoCode;
       ctx.wizard.state.discountPercent = discountPercent;
@@ -150,8 +145,9 @@ const checkoutScene = new Scenes.WizardScene(
     ctx.wizard.state.awaitingPromo = true;
     await ctx.reply(t(lang, 'promoPrompt'));
   },
-  // Шаг 5: ждём нажатия кнопки оплаты (обрабатывается глобальным action ниже)
-  async (ctx) => {}
+  // Шаг 5: ждём нажатия кнопки оплаты (обрабатывается action ниже).
+  // Всё остальное (вопрос в чат, команда) пропускаем дальше — бот не должен «зависать» в оформлении.
+  async (ctx, next) => next()
 );
 
 // выбор города из списка кнопок
@@ -183,6 +179,7 @@ checkoutScene.action('deliv_other', async (ctx) => {
 checkoutScene.action('deliv_pickup', async (ctx) => {
   const lang = db.getLang(ctx.chat.id);
   await ctx.answerCbQuery();
+  if (!db.getDeliverySettings().pickup) return ctx.reply('Самовывоза сейчас нет — выберите город доставки 🙏');
   ctx.wizard.state.address = t(lang, 'pickupSet');
   ctx.wizard.state.deliveryCity = null;
   ctx.wizard.state.deliveryCost = 0;
@@ -221,8 +218,8 @@ checkoutScene.action('pay_yookassa', async (ctx) => {
       return ctx.reply(t(lang, 'insufficientStock', (lang === 'en' && i.name_en) || i.name, i.stock));
     }
   }
-  const finalTotal =
-    (discountPercent > 0 ? Math.round((nowTotal * (100 - discountPercent)) / 100) : nowTotal) + deliveryCost;
+  const q = pricing.quote(nowTotal, discountPercent, deliveryCity);
+  const finalTotal = q.total;
 
   const orderId = createPendingOrder(
     ctx.chat.id,
@@ -232,19 +229,19 @@ checkoutScene.action('pay_yookassa', async (ctx) => {
     promoCode,
     discountPercent,
     deliveryCity,
-    deliveryCost
+    q.delivery
   );
-  if (promoCode) {
-    db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE code = ?').run(promoCode);
-  }
+  // промокод засчитываем, когда придёт оплата (orders.markPaid)
   await ctx.scene.leave();
 
   try {
     const payment = await createPayment(orderId, finalTotal / 100, `Заказ #${orderId}`);
-    db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(
+    db.prepare('UPDATE orders SET status = ?, payment_id = ? WHERE id = ?').run(
       `awaiting_payment:${payment.id}`,
+      payment.id,
       orderId
     );
+    db.prepare('DELETE FROM cart_items WHERE chat_id = ?').run(ctx.chat.id); // корзина превратилась в заказ
     const orderCode = db.prepare('SELECT order_code FROM orders WHERE id = ?').get(orderId)?.order_code;
     await ctx.reply(
       t(lang, 'payLinkText', orderCode || orderId),

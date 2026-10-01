@@ -16,17 +16,25 @@ async function sendToBuyer(bot, chatId, { text, photo }) {
   const url = orders.shopUrl();
   const reply_markup = url ? { inline_keyboard: [[{ text: lang === 'en' ? '🛍 Open the shop' : '🛍 Открыть магазин', web_app: { url } }]] } : undefined;
   if (photo) {
-    await bot.telegram.sendPhoto(chatId, photo, { caption: text ? `${head}\n${esc(text)}` : head, parse_mode: 'HTML', reply_markup });
+    await bot.telegram.sendPhoto(chatId, photo, { caption: text ? `${head}\n${escFit(text, 950)}` : head, parse_mode: 'HTML', reply_markup });
   } else {
-    await bot.telegram.sendMessage(chatId, `${head}\n${esc(text)}`, { parse_mode: 'HTML', reply_markup });
+    await bot.telegram.sendMessage(chatId, `${head}\n${escFit(text, 4000)}`, { parse_mode: 'HTML', reply_markup });
   }
   db.addMessage({ chatId, fromOwner: true, text: text || null, photo: photo || null });
 }
 
-function setupChat(bot) {
-  const replyTo = new Map(); // владелица нажала «💬 Написать» → следующий её текст уйдёт этому покупателю
-  const acked = new Map();   // кому уже сказали «передали менеджеру» (не чаще раза в 30 минут)
+const replyTo = new Map(); // владелица нажала «💬 Написать» → следующий её текст уйдёт этому покупателю
+const acked = new Map();   // кому уже сказали «передали менеджеру» (не чаще раза в 30 минут)
+const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+// Экранируем и укладываемся в лимит Telegram (после экранирования «&» превращается в «&amp;»)
+function escFit(text, max) {
+  let t = String(text || '');
+  while (t && esc(t).length > max) t = cut(t, Math.floor(t.length * 0.8));
+  return esc(t);
+}
 
+// Кнопки (статусы, ответ, оценка) — регистрируются ДО сценария оформления, чтобы работали всегда
+function setupActions(bot) {
   // ── Кнопки статусов под уведомлением владелице ──
   bot.action(/^ost:(\d+):(\w+)$/, async (ctx) => {
     if (!isOwnerId(ctx.from.id)) return ctx.answerCbQuery('Только для владелицы');
@@ -94,7 +102,45 @@ function setupChat(bot) {
     return next();
   });
 
-  // ── Свободные сообщения (регистрируется последним — после всех кнопок и сценариев) ──
+}
+
+// Свободные сообщения — регистрируется последним, после всех кнопок и сценариев
+function setupRelay(bot) {
+  // Голосовые, файлы, видео, стикеры — пересылаем владелице копией
+  const MEDIA = { voice: '🎤 Голосовое', audio: '🎵 Аудио', document: '📎 Файл', video: '🎬 Видео', video_note: '⭕️ Видеосообщение', sticker: 'Стикер' };
+  bot.on(Object.keys(MEDIA), async (ctx, next) => {
+    if (ctx.chat?.type !== 'private') return next();
+    const kind = Object.keys(MEDIA).find((k) => ctx.message[k]);
+    const owner = process.env.OWNER_CHAT_ID;
+    if (isOwnerId(ctx.from.id)) {
+      const r = ctx.message.reply_to_message;
+      const w = replyTo.get(String(ctx.from.id));
+      const target = (r && db.chatByOwnerMsg(r.message_id)) || (w && w.until > Date.now() ? w.chatId : null);
+      if (!target || String(target) === String(ctx.from.id)) return next();
+      try {
+        await bot.telegram.copyMessage(target, ctx.chat.id, ctx.message.message_id);
+        db.addMessage({ chatId: target, fromOwner: true, text: `[${MEDIA[kind]}]` });
+        replyTo.delete(String(ctx.from.id));
+        return ctx.reply(`✓ Отправлено: ${db.getName(target) || 'покупателю'}`);
+      } catch (e) { return ctx.reply('Telegram не доставил: ' + e.message); }
+    }
+    const chatId = ctx.from.id;
+    const caption = (ctx.message.caption || '').trim();
+    const msgId = db.addMessage({ chatId, text: `[${MEDIA[kind]}]${caption ? ' ' + cut(caption, 3500) : ''}` });
+    if (owner) {
+      const name = db.getName(chatId) || ctx.from.first_name || 'Покупатель';
+      await bot.telegram.sendMessage(owner, `💬 <a href="tg://user?id=${chatId}">${esc(name)}</a> прислал(а): ${MEDIA[kind]}`, {
+        parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '↩️ Ответить', callback_data: `reply:${chatId}` }]] },
+      }).catch(() => null);
+      const m = await bot.telegram.copyMessage(owner, ctx.chat.id, ctx.message.message_id).catch((e) => console.error('Чат: не переслала медиа', e.message));
+      if (m) db.setOwnerMsgId(msgId, m.message_id);
+    }
+    if (Date.now() - (acked.get(chatId) || 0) > 30 * 60_000) {
+      acked.set(chatId, Date.now());
+      await ctx.reply(db.getLang(chatId) === 'en' ? 'Got it! Passed to our manager — we\u2019ll reply right here 💬' : 'Получили! Передали менеджеру — ответим прямо здесь 💬');
+    }
+  });
+
   bot.on(['text', 'photo'], async (ctx, next) => {
     if (ctx.chat?.type !== 'private') return next();
     const text = ctx.message.text ?? ctx.message.caption ?? '';
@@ -136,9 +182,12 @@ function setupChat(bot) {
       const head = `💬 <a href="tg://user?id=${chatId}">${esc(name)}</a>${ctx.from.username ? ' @' + esc(ctx.from.username) : ''}${about}`;
       const url = orders.shopUrl({ tab: 'admin', adm: 'chats', chat: chatId });
       const reply_markup = { inline_keyboard: [[{ text: '↩️ Ответить', callback_data: `reply:${chatId}` }].concat(url ? [{ text: '💬 Все чаты', web_app: { url } }] : [])] };
+      // Лимиты Telegram: 4096 символов в сообщении и 1024 в подписи к фото (после экранирования)
       const m = photo
-        ? await bot.telegram.sendPhoto(owner, photo, { caption: `${head}${text ? '\n' + esc(text) : ''}`, parse_mode: 'HTML', reply_markup }).catch(() => null)
-        : await bot.telegram.sendMessage(owner, `${head}\n${esc(text)}`, { parse_mode: 'HTML', reply_markup }).catch(() => null);
+        ? await bot.telegram.sendPhoto(owner, photo, { caption: `${head}${text ? '\n' + escFit(text, 800) : ''}`, parse_mode: 'HTML', reply_markup })
+          .catch((e) => console.error('Чат: не переслала фото владелице', e.message))
+        : await bot.telegram.sendMessage(owner, `${head}\n${escFit(text, 3800)}`, { parse_mode: 'HTML', reply_markup })
+          .catch((e) => console.error('Чат: не переслала сообщение владелице', e.message));
       if (m) db.setOwnerMsgId(msgId, m.message_id);
     }
     if (Date.now() - (acked.get(chatId) || 0) > 30 * 60_000) {
@@ -149,4 +198,4 @@ function setupChat(bot) {
   });
 }
 
-module.exports = { setupChat, sendToBuyer };
+module.exports = { setupActions, setupRelay, sendToBuyer };

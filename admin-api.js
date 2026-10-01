@@ -15,7 +15,7 @@ module.exports = function adminApi(app, { bot, adm }) {
     const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
     // created_at — UTC; считаем дни по Москве (+3 ч)
     const all = db.prepare(`SELECT *, date(created_at, '+3 hours') AS day FROM orders
-                            WHERE created_at >= datetime('now', ?)`).all(`-${days} days`);
+                            WHERE date(created_at, '+3 hours') >= date('now', '+3 hours', ?)`).all(`-${days - 1} days`);
     const items = db.prepare(`SELECT oi.order_id, oi.product_id, oi.quantity, oi.price, p.name FROM order_items oi
                               LEFT JOIN products p ON p.id = oi.product_id`).all();
     const byOrder = new Map();

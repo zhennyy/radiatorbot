@@ -630,7 +630,7 @@ function nextStep(o) {
   if (o.status === 'paid') return ['assembling', '📦 Начать сборку'];
   if (o.status === 'assembling') return ['shipped', o.pickup ? '🏠 Готов к выдаче' : '🚚 Отправить'];
   if (o.status === 'shipped') return ['delivered', o.pickup ? '✅ Выдан' : '✅ Доставлен'];
-  if (o.status === 'cancelled') return ['paid', '↩️ Вернуть в работу'];
+  if (o.status === 'cancelled') return ['paid', o.was_paid ? '↩️ Вернуть в работу' : '✅ Оплачен (вручную)'];
   return null;
 }
 function orderCard(o) {
@@ -880,7 +880,10 @@ const coGoods = () => { const { sum } = cartTotals(); return sum - (co.promoPct 
 const coFree = () => Boolean(coInfo && coInfo.freeFrom > 0 && coGoods() >= coInfo.freeFrom);
 const coCost = () => {
   if (co.delivery === 'pickup' || !coInfo || coFree()) return 0;
-  const c = coInfo.cities.find(x => x.city === co.city);
+  const n = s => String(s || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
+  // «Другой город», но вписали город из списка (например «москва») — берём его тариф, как и сервер
+  const want = co.city === '__other' ? n(co.other) : n(co.city);
+  const c = coInfo.cities.find(x => n(x.city) === want || (x.city_en && n(x.city_en) === want));
   return c ? c.price : (co.city === '__other' ? coInfo.otherPrice : 0);
 };
 async function openCheckout() {
@@ -925,7 +928,7 @@ function renderCheckout() {
     ${inTg ? '' : `<button class="btn" data-pay>Оплатить · ${rub(total)}</button>`}
     <div class="note">${L.checkoutNote}</div>`;
   const bind = (id, k, rerender) => { const el = $(id); if (el) el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = e => { co[k] = e.target.value; if (rerender) renderCheckout(); else mainButton(); }; };
-  bind('coCity', 'city', true); bind('coOther', 'other'); bind('coAddr', 'address'); bind('coPhone', 'phone'); bind('coPromo', 'promo');
+  bind('coCity', 'city', true); bind('coOther', 'other'); if ($('coOther')) $('coOther').onchange = () => renderCheckout(); bind('coAddr', 'address'); bind('coPhone', 'phone'); bind('coPromo', 'promo');
   mainButton();
 }
 function coTotal() { return coGoods() + coCost(); }

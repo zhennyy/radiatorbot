@@ -5,7 +5,7 @@ const db = require('./db');
 // Порядок статусов. «Деньги получены» — это всё, что начиная с paid (кроме отмены).
 const FLOW = ['paid', 'assembling', 'shipped', 'delivered'];
 const PAID = new Set(FLOW);
-const ALL = new Set(['awaiting_payment', ...FLOW, 'cancelled']);
+const ALL = new Set([...FLOW, 'cancelled']); // вручную в «ждёт оплату» не возвращаем
 
 const LABEL = {
   ru: { awaiting_payment: '⏳ Ждёт оплату', pending: '⏳ Ждёт оплату', paid: '🆕 Оплачен', assembling: '📦 Собираем',
@@ -34,7 +34,7 @@ function getOrder(id) {
   if (!o) return null;
   o.base = base(o.status);
   o.code = o.order_code || String(o.id);
-  o.items = db.prepare(`SELECT oi.product_id, oi.quantity, oi.price, p.name, p.name_en FROM order_items oi
+  o.items = db.prepare(`SELECT oi.rowid AS rid, oi.product_id, oi.quantity, oi.price, oi.stock_taken, p.name, p.name_en FROM order_items oi
                         LEFT JOIN products p ON p.id = oi.product_id WHERE oi.order_id = ?`).all(id);
   return o;
 }
@@ -130,7 +130,7 @@ function ownerText(o) {
 function ownerKeyboard(o) {
   const b = (st, text) => ({ text: (o.base === st ? '• ' : '') + text, callback_data: `ost:${o.id}:${st}` });
   const rows = [];
-  if (o.base === 'cancelled') rows.push([b('paid', '↩️ Вернуть в работу')]);
+  if (o.base === 'cancelled') rows.push([b('paid', o.paid_at ? '↩️ Вернуть в работу' : '✅ Оплачен (вручную)')]);
   else {
     rows.push([b('assembling', '📦 Собираем'), b('shipped', isPickup(o) ? '🏠 Готов к выдаче' : '🚚 Отправлен')]);
     rows.push([b('delivered', '✅ Доставлен'), b('cancelled', '❌ Отменить')]);
@@ -147,9 +147,31 @@ async function notifyOwnerNew(bot, o) {
 }
 
 // ===== Склад =====
-function moveStock(o, sign) {
-  const st = db.prepare('UPDATE products SET stock = MAX(0, stock + ?) WHERE id = ?');
-  for (const i of o.items) st.run(sign * i.quantity, i.product_id);
+// Списываем не больше, чем есть, и запоминаем, сколько взяли. Возвращает нехватку.
+function takeStock(o) {
+  const short = [];
+  for (const i of o.items) {
+    const need = i.quantity - (i.stock_taken || 0);
+    if (need <= 0) continue;
+    const have = db.prepare('SELECT stock FROM products WHERE id = ?').get(i.product_id)?.stock ?? 0;
+    const take = Math.max(0, Math.min(have, need));
+    if (take) db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(take, i.product_id);
+    db.prepare('UPDATE order_items SET stock_taken = stock_taken + ? WHERE rowid = ?').run(take, i.rid);
+    if (take < need) short.push(`${i.name || 'товар'} — не хватило ${need - take} шт.`);
+  }
+  return short;
+}
+// Возвращаем ровно то, что списали
+function returnStock(o) {
+  for (const i of o.items) {
+    if (!i.stock_taken) continue;
+    db.prepare('UPDATE products SET stock = stock + ? WHERE id = ?').run(i.stock_taken, i.product_id);
+    db.prepare('UPDATE order_items SET stock_taken = 0 WHERE rowid = ?').run(i.rid);
+  }
+}
+async function warnShortage(bot, o, short) {
+  if (!short.length || !ownerId()) return;
+  await bot.telegram.sendMessage(ownerId(), `⚠️ Заказ № ${o.code} оплачен, но на складе не хватило:\n${short.join('\n')}\n\nСвяжитесь с покупателем: дозаказать товар или вернуть часть денег.`).catch(() => {});
 }
 
 // Сменить статус заказа (из админки или кнопкой в Telegram)
@@ -162,30 +184,42 @@ async function changeStatus(bot, id, status, { track } = {}) {
   const newTrack = track === undefined ? o.track : String(track || '').trim().slice(0, 60) || null;
   if (o.base === status && newTrack === o.track) return o;
 
-  const tx = db.transaction(() => {
-    if (wasPaid && status === 'cancelled') moveStock(o, +1);      // вернули товар на склад
-    if (!wasPaid && nowPaid) moveStock(o, -1);                     // вернули в работу / оплачен вручную
-    db.prepare("UPDATE orders SET status = ?, track = ?, status_at = datetime('now') WHERE id = ?").run(status, newTrack, id);
-  });
-  tx();
+  let short = [];
+  db.transaction(() => {
+    if (wasPaid && status === 'cancelled') returnStock(o);         // вернули товар на склад
+    if (!wasPaid && nowPaid) short = takeStock(o);                  // вернули в работу / оплачен вручную
+    db.prepare(`UPDATE orders SET status = ?, track = ?, status_at = datetime('now'),
+                paid_at = CASE WHEN ? THEN COALESCE(paid_at, datetime('now')) ELSE paid_at END WHERE id = ?`)
+      .run(status, newTrack, nowPaid ? 1 : 0, id);
+  })();
   const updated = getOrder(id);
-  if (status !== 'awaiting_payment') await notifyBuyer(bot, updated);
+  await notifyBuyer(bot, updated);
+  await warnShortage(bot, updated, short);
   return updated;
 }
 
-// Оплата пришла (вебхук ЮKassa). Возвращает true, если заказ действительно перевели в «оплачен».
-async function markPaid(bot, orderId) {
-  const o = getOrder(orderId);
-  if (!o || PAID.has(o.base)) return false; // уже обработан
+// Оплата пришла (вебхук ЮKassa). Засчитываем платёж только один раз и только «свой»:
+// повтор уведомления после возврата денег или чужой платёж заказ не «оживят».
+async function markPaid(bot, orderId, paymentId) {
+  let o = getOrder(orderId);
+  if (!o || o.paid_at || PAID.has(o.base)) return false;       // деньги по заказу уже засчитаны
+  const own = o.payment_id || (String(o.status).startsWith('awaiting_payment:') ? String(o.status).slice(17) : null);
+  if (!paymentId || own !== paymentId) return false;           // это не платёж этого заказа
   const wasCancelled = o.base === 'cancelled';
-  db.transaction(() => {
-    moveStock(o, -1);
-    db.prepare("UPDATE orders SET status = 'paid', status_at = datetime('now') WHERE id = ?").run(orderId);
-    db.prepare('DELETE FROM cart_items WHERE chat_id = ?').run(o.chat_id);
+  let short = [];
+  const done = db.transaction(() => {
+    o = getOrder(orderId);                                       // перечитали внутри транзакции
+    if (o.paid_at) return false;
+    short = takeStock(o);
+    db.prepare("UPDATE orders SET status = 'paid', status_at = datetime('now'), paid_at = datetime('now') WHERE id = ?").run(orderId);
+    if (o.promo_code) db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE code = ?').run(o.promo_code);
+    return true;
   })();
+  if (!done) return false;
   const paid = getOrder(orderId);
   await notifyBuyer(bot, paid);
   await notifyOwnerNew(bot, paid);
+  await warnShortage(bot, paid, short);
   if (wasCancelled && ownerId()) {
     await bot.telegram.sendMessage(ownerId(), `⚠️ Заказ № ${paid.code} был отменён, но покупатель всё-таки оплатил — вернула его в работу.`).catch(() => {});
   }

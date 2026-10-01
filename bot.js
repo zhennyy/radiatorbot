@@ -11,8 +11,16 @@ const { t } = require('./i18n');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-const stage = new Scenes.Stage([checkoutScene]);
+// ttl: брошенное оформление само забывается через 30 минут
+const stage = new Scenes.Stage([checkoutScene], { ttl: 30 * 60 });
 bot.use(session());
+// Любая команда (/start, /cart…) во время оформления в чате — выходим из оформления, а не «глотаем» её
+bot.use((ctx, next) => {
+  if (ctx.session?.__scenes?.current && ctx.message?.text?.startsWith('/')) delete ctx.session.__scenes;
+  return next();
+});
+// Кнопки статусов, ответы покупателям и оценки работают всегда — даже посреди оформления
+require('./chat').setupActions(bot);
 bot.use(stage.middleware());
 
 function formatPrice(kopecks) {
@@ -340,6 +348,13 @@ bot.on('text', async (ctx, next) => {
       ctx.session.awaitingName = true;
       return ctx.reply(t(lang, 'askName'));
     }
+    // Вместо имени сразу написали вопрос — не записываем его как имя: берём имя из Telegram,
+    // а сообщение передаём менеджеру
+    if (name.length > 30 || /[?!.,:;()\d]/.test(name) || name.split(/\s+/).length > 3) {
+      db.setName(ctx.chat.id, (ctx.from.first_name || '').slice(0, 64) || '—');
+      if (SHOP_URL) await ctx.reply(t(lang, 'nameSavedShop', ctx.from.first_name || ''), shopKeyboard(lang));
+      return next();
+    }
     db.setName(ctx.chat.id, name);
     await ctx.reply(SHOP_URL ? t(lang, 'nameSavedShop', name) : t(lang, 'nameSaved', name), SHOP_URL ? shopKeyboard(lang) : buildMainMenu(lang));
     return;
@@ -616,10 +631,10 @@ bot.command('orders', isOwner, async (ctx) => {
     let text = `<b>Заказ #${o.id}</b>\n`;
     text += `${statusLabel}\n\n`;
     if (o.discount_percent > 0) {
-      text += `Промокод «${o.promo_code}»: −${o.discount_percent}%\n`;
+      text += `Промокод «${escapeHtml(o.promo_code || '')}»: −${o.discount_percent}%\n`;
     }
     if (o.delivery_cost > 0) {
-      text += `🚚 Доставка${o.delivery_city ? ` (${o.delivery_city})` : ''}: ${formatPrice(o.delivery_cost)}\n`;
+      text += `🚚 Доставка${o.delivery_city ? ` (${escapeHtml(o.delivery_city)})` : ''}: ${formatPrice(o.delivery_cost)}\n`;
     } else if (o.delivery_city === null && (o.address === 'Самовывоз' || o.address === 'Pickup')) {
       text += `🚚 Самовывоз\n`;
     }
@@ -627,7 +642,7 @@ bot.command('orders', isOwner, async (ctx) => {
     text += `📍 ${escapeHtml(o.address || "—")}\n`;
     text += `🕐 ${date}`;
 
-    await ctx.reply(text, { parse_mode: 'HTML' });
+    await ctx.reply(text, { parse_mode: 'HTML' }).catch((e) => console.error('/orders:', e.message));
   }
 });
 
@@ -753,8 +768,8 @@ bot.command('markshipped', isOwner, async (ctx) => {
   } catch (e) { ctx.reply(e.message); }
 });
 
-// Переписка с покупателями, кнопки статусов, оценки — регистрируем последними
-require('./chat').setupChat(bot);
+// Переписка с покупателями — регистрируем последней, после всех кнопок и сценариев
+require('./chat').setupRelay(bot);
 
 // Ошибка в одном обработчике не должна ронять бота целиком
 bot.catch((err, ctx) => console.error('Ошибка бота:', ctx?.updateType, err?.message || err));

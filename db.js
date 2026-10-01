@@ -364,6 +364,22 @@ if (!oc.includes('track')) db.exec('ALTER TABLE orders ADD COLUMN track TEXT');
 if (!oc.includes('rating')) db.exec('ALTER TABLE orders ADD COLUMN rating INTEGER');
 if (!oc.includes('status_at')) db.exec('ALTER TABLE orders ADD COLUMN status_at TEXT');
 if (!oc.includes('status_msg_id')) db.exec('ALTER TABLE orders ADD COLUMN status_msg_id INTEGER');
+// payment_id — платёж ЮKassa, который оплачивает именно этот заказ; paid_at — когда деньги пришли (один раз)
+if (!oc.includes('payment_id')) {
+  db.exec('ALTER TABLE orders ADD COLUMN payment_id TEXT');
+  db.exec("UPDATE orders SET payment_id = substr(status, 18) WHERE status LIKE 'awaiting_payment:%'");
+}
+if (!oc.includes('paid_at')) {
+  db.exec('ALTER TABLE orders ADD COLUMN paid_at TEXT');
+  db.exec("UPDATE orders SET paid_at = created_at WHERE status IN ('paid','assembling','shipped','delivered')");
+}
+// сколько штук реально списали со склада по позиции — столько и вернём при отмене
+const ic = db.prepare('PRAGMA table_info(order_items)').all().map((c) => c.name);
+if (!ic.includes('stock_taken')) {
+  db.exec('ALTER TABLE order_items ADD COLUMN stock_taken INTEGER NOT NULL DEFAULT 0');
+  db.exec(`UPDATE order_items SET stock_taken = quantity WHERE order_id IN
+           (SELECT id FROM orders WHERE status IN ('paid','assembling','shipped','delivered'))`);
+}
 
 module.exports = db;
 Object.defineProperty(module.exports, 'DEFAULT_DELIVERY_PRICE', { get: () => getDeliverySettings().otherPrice, enumerable: true });
