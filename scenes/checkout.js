@@ -284,4 +284,4 @@ function createPendingOrder(
   return orderId;
 }
 
-module.exports = { checkoutScene, createPendingOrder };
+module.exports = { checkoutScene, createPendingOrder, getDeliveryPrice };

@@ -147,6 +147,18 @@
   .ostat button.on{background:var(--text);color:var(--bg);border-color:var(--text)}
   .tabs .in.five{grid-template-columns:repeat(5,1fr)}
   .tabs button[hidden]{display:none}
+
+  /* оформление */
+  .co .box{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px}
+  .co .box h3{margin:0 0 10px;font-size:15px}
+  .co select,.co input,.co textarea{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;outline:0}
+  .co textarea{min-height:64px;resize:vertical}
+  .co .fld{margin-top:10px}
+  .co .promo{display:flex;gap:8px} .co .promo .btn{width:auto;padding:0 16px}
+  .co .sumrow{display:flex;justify-content:space-between;padding:4px 0;color:var(--muted)}
+  .co .sumrow.big{color:var(--text);font-weight:800;font-size:19px;border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+  .co .ok{color:var(--ok)}
+  .order .pay{margin-top:10px}
 </style>
 </head>
 <body>
@@ -164,6 +176,7 @@
 
   <section class="view" id="v-cart"></section>
   <section class="view" id="v-orders"></section>
+  <section class="view co" id="v-checkout"></section>
 
   <section class="view" id="v-admin"></section>
 
@@ -202,7 +215,7 @@ const T = {
         err: 'Не получилось загрузить. Проверьте интернет и попробуйте ещё раз.', retry: 'Обновить',
         notTg: 'Откройте магазин из Telegram — кнопка «🛍 Магазин» в чате с ботом.',
         cartTitle: 'Корзина', cartEmpty: 'Корзина пока пуста', toCatalog: 'Перейти в каталог',
-        checkoutNote: 'Доставку, адрес и оплату уточним в чате — это займёт минуту.',
+        checkoutNote: 'Оплата картой или СБП через ЮKassa — безопасно.',
         ordersTitle: 'Мои заказы', ordersEmpty: 'Заказов пока нет', delivery: 'Доставка',
         aiTitle: 'Подберём радиатор', aiPh: 'Опишите комнату: площадь, где стоит, стиль, бюджет…', aiGo: 'Подобрать', aiWait: 'Подбираю',
         aiHints: ['Ванная 5 м², хром, до 10 000 ₽', 'Гостиная 25 м², белый, вертикальный', 'Лофт, чёрный, большой'], aiNone: 'Под запрос ничего не нашлось — попробуйте описать иначе' },
@@ -212,7 +225,7 @@ const T = {
         err: 'Could not load. Check your connection and try again.', retry: 'Retry',
         notTg: 'Open the shop from Telegram — the «🛍 Магазин» button in the bot chat.',
         cartTitle: 'Cart', cartEmpty: 'Your cart is empty', toCatalog: 'Go to catalog',
-        checkoutNote: 'We will confirm delivery, address and payment in the chat — it takes a minute.',
+        checkoutNote: 'Pay by card or SBP via ЮKassa — secure.',
         ordersTitle: 'My orders', ordersEmpty: 'No orders yet', delivery: 'Delivery',
         aiTitle: 'Find the right radiator', aiPh: 'Describe the room: size, placement, style, budget…', aiGo: 'Find', aiWait: 'Thinking',
         aiHints: ['Bathroom 5 m², chrome, under 10 000 ₽', 'Living room 25 m², white, vertical', 'Loft, black, large'], aiNone: 'Nothing matched — try describing it differently' },
@@ -323,7 +336,8 @@ function mainButton() {
   const { n, sum } = cartTotals();
   // в корзине — «Оформить», на других вкладках при непустой корзине — «Корзина · сумма»
   if (n > 0 && tab !== 'orders' && tab !== 'admin') {
-    tg.MainButton.setParams({ text: tab === 'cart' ? L.checkout(rub(sum)) : `🛒 ${L.tCart} · ${rub(sum)}`, color: '#e8590c', text_color: '#ffffff' });
+    const text = tab === 'checkout' ? `Оплатить · ${rub(coTotal())}` : tab === 'cart' ? L.checkout(rub(sum)) : `🛒 ${L.tCart} · ${rub(sum)}`;
+    tg.MainButton.setParams({ text, color: '#e8590c', text_color: '#ffffff' });
     tg.MainButton.show();
   } else tg.MainButton.hide();
 }
@@ -363,6 +377,7 @@ async function loadOrders() {
         ${o.delivery_cost ? `<li><span>${L.delivery}</span><span>${rub(o.delivery_cost)}</span></li>` : ''}</ul>
       <div class="sum"><span>${L.total}</span><span>${rub(o.total)}</span></div>
       <div class="meta">${esc((o.created_at || '').slice(0, 16).replace('T', ' '))}${o.address ? ' · ' + esc(o.address) : ''}</div>
+      ${o.can_pay ? `<button class="btn pay" data-payorder="${o.id}">💳 Оплатить ${rub(o.total)}</button>` : ''}
     </div>`).join('') : `<div class="empty"><b>📦</b>${L.ordersEmpty}</div>`);
 }
 
@@ -406,7 +421,7 @@ function closeSheet() { openId = null; document.body.classList.remove('open'); i
 function go(t) {
   tab = t;
   document.querySelectorAll('section.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + t));
-  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === (t === 'checkout' ? 'cart' : t)));
   if (t === 'orders') loadOrders();
   if (t === 'admin') loadAdmin();
   if (t === 'cart') renderCart();
@@ -426,7 +441,7 @@ document.addEventListener('click', e => {
   else if (d.open) openSheet(+d.open);
   else if (d.tab) go(d.tab);
   else if (d.hint) { $('aiQ').value = d.hint; aiAsk(); }
-  else if (d.checkout !== undefined) checkout();
+  else if (d.checkout !== undefined) openCheckout();
   else if (d.retry !== undefined) load();
   else if (d.lang && d.lang !== lang) {
     lang = d.lang; applyLang(); renderChips(); renderGrid(); renderCart();
@@ -437,8 +452,8 @@ document.addEventListener('click', e => {
 $('veil').onclick = closeSheet;
 $('q').oninput = e => { query = e.target.value; renderGrid(); };
 $('aiGo').onclick = aiAsk;
-tg?.MainButton?.onClick(() => (tab === 'cart' ? checkout() : go('cart')));
-tg?.BackButton?.onClick(() => (openId ? closeSheet() : go('catalog')));
+tg?.MainButton?.onClick(() => (tab === 'checkout' ? pay() : tab === 'cart' ? openCheckout() : go('cart')));
+tg?.BackButton?.onClick(() => (openId ? closeSheet() : tab === 'checkout' ? go('cart') : go('catalog')));
 
 
 /* ---------- админка (только владелица) ---------- */
@@ -559,6 +574,99 @@ document.addEventListener('click', e => {
       .catch(err => toast(err.message));
   }
   else if (d.ost) { const [id, st] = d.ost.split(':'); setOrderStatus(+id, st); }
+});
+
+
+/* ---------- оформление и оплата ---------- */
+let co = { delivery: 'city', city: '', other: '', address: '', phone: '', promo: '', promoPct: 0, promoOk: '' }, coInfo = null;
+const coCost = () => {
+  if (co.delivery === 'pickup' || !coInfo) return 0;
+  const c = coInfo.cities.find(x => x.city === co.city);
+  return c ? c.price : (co.city === '__other' ? coInfo.otherPrice : 0);
+};
+async function openCheckout() {
+  if (!cartTotals().n) { toast(L.cartEmpty); return; }
+  go('checkout');
+  if (!coInfo) {
+    $('v-checkout').innerHTML = `<h1>Оформление</h1><div class="skel" style="aspect-ratio:3/1"></div>`;
+    try { coInfo = await api('/checkout-info'); } catch (e) { $('v-checkout').innerHTML = `<h1>Оформление</h1><div class="empty">${esc(e.message)}</div>`; return; }
+    if (!co.city && coInfo.cities.length) co.city = (coInfo.cities.find(c => /петербург/i.test(c.city)) || coInfo.cities[0]).city;
+  }
+  renderCheckout();
+}
+function renderCheckout() {
+  const { sum } = cartTotals();
+  const disc = co.promoPct ? Math.round(sum * co.promoPct / 100) : 0;
+  const dcost = coCost();
+  const total = sum - disc + dcost;
+  const cityName = c => (lang === 'en' && c.city_en) || c.city;
+  $('v-checkout').innerHTML = `<h1>Оформление</h1>
+    <div class="box"><h3>Получение</h3>
+      <div class="seg"><button data-dl="city" class="${co.delivery === 'city' ? 'on' : ''}">🚚 Доставка</button><button data-dl="pickup" class="${co.delivery === 'pickup' ? 'on' : ''}">🏠 Самовывоз</button></div>
+      ${co.delivery === 'city' ? `
+        <div class="fld"><select id="coCity">${coInfo.cities.map(c => `<option value="${esc(c.city)}" ${co.city === c.city ? 'selected' : ''}>${esc(cityName(c))} — ${rub(c.price)}</option>`).join('')}
+          <option value="__other" ${co.city === '__other' ? 'selected' : ''}>Другой город — ${rub(coInfo.otherPrice)}</option></select></div>
+        ${co.city === '__other' ? `<div class="fld"><input id="coOther" placeholder="Город" value="${esc(co.other)}"></div>` : ''}
+        <div class="fld"><textarea id="coAddr" placeholder="Улица, дом, квартира, подъезд">${esc(co.address)}</textarea></div>` : `<div class="note" style="text-align:left;margin-top:10px">Заберёте сами — адрес и время пришлём в чат после оплаты.</div>`}
+      <div class="fld"><input id="coPhone" type="tel" inputmode="tel" placeholder="Телефон для связи" value="${esc(co.phone)}"></div>
+    </div>
+    <div class="box"><h3>Промокод</h3>
+      <div class="promo"><input id="coPromo" placeholder="Если есть" value="${esc(co.promo)}" autocapitalize="characters"><button class="btn ghost" data-promo>Применить</button></div>
+      ${co.promoOk ? `<div class="fld ok">✓ ${esc(co.promoOk)}</div>` : ''}
+    </div>
+    <div class="box">
+      <div class="sumrow"><span>Товары</span><span>${rub(sum)}</span></div>
+      ${disc ? `<div class="sumrow"><span>Скидка ${co.promoPct}%</span><span>−${rub(disc)}</span></div>` : ''}
+      <div class="sumrow"><span>Доставка</span><span>${co.delivery === 'pickup' ? 'бесплатно' : rub(dcost)}</span></div>
+      <div class="sumrow big"><span>Итого</span><span>${rub(total)}</span></div>
+    </div>
+    ${inTg ? '' : `<button class="btn" data-pay>Оплатить · ${rub(total)}</button>`}
+    <div class="note">${L.checkoutNote}</div>`;
+  const bind = (id, k, rerender) => { const el = $(id); if (el) el[el.tagName === 'SELECT' ? 'onchange' : 'oninput'] = e => { co[k] = e.target.value; if (rerender) renderCheckout(); else mainButton(); }; };
+  bind('coCity', 'city', true); bind('coOther', 'other'); bind('coAddr', 'address'); bind('coPhone', 'phone'); bind('coPromo', 'promo');
+  mainButton();
+}
+function coTotal() { const { sum } = cartTotals(); return sum - (co.promoPct ? Math.round(sum * co.promoPct / 100) : 0) + coCost(); }
+async function applyPromo() {
+  co.promo = ($('coPromo')?.value || '').trim();
+  if (!co.promo) { co.promoPct = 0; co.promoOk = ''; renderCheckout(); return; }
+  try { const d = await api('/promo', { code: co.promo }, 1); co.promoPct = d.percent; co.promoOk = `Скидка ${d.percent}%`; haptic('medium'); }
+  catch (e) { co.promoPct = 0; co.promoOk = ''; toast(e.message); }
+  renderCheckout();
+}
+let paying = false;
+async function pay() {
+  if (paying) return;
+  if (co.delivery === 'city') {
+    if (co.city === '__other' && co.other.trim().length < 2) { toast('Укажите город'); $('coOther')?.focus(); return; }
+    if (co.address.trim().length < 5) { toast('Укажите адрес доставки'); $('coAddr')?.focus(); return; }
+  }
+  if (co.promo && !co.promoPct) { await applyPromo(); if (!co.promoPct) return; }
+  paying = true; tg?.MainButton?.showProgress?.();
+  try {
+    const d = await api('/order', { delivery: co.delivery === 'pickup' ? 'pickup' : 'city', city: co.city === '__other' ? co.other.trim() : co.city,
+      address: co.address, phone: co.phone, promo: co.promoPct ? co.promo : '' }, 1);
+    haptic('heavy');
+    cart = {}; renderCart(); renderGrid();
+    co.promo = ''; co.promoPct = 0; co.promoOk = '';
+    if (tg?.openLink) tg.openLink(d.pay_url); else window.open(d.pay_url, '_blank');
+    go('orders');
+    toast(`Заказ ${d.code} создан — осталось оплатить 💳`);
+  } catch (e) { toast(e.message); }
+  finally { paying = false; tg?.MainButton?.hideProgress?.(); }
+}
+async function payOrder(id) {
+  try { const d = await api(`/orders/${id}/pay`, {}, 1); if (tg?.openLink) tg.openLink(d.pay_url); else window.open(d.pay_url, '_blank'); }
+  catch (e) { toast(e.message); }
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-dl],[data-promo],[data-pay],[data-payorder]');
+  if (!t) return;
+  const d = t.dataset;
+  if (d.dl) { co.delivery = d.dl; renderCheckout(); }
+  else if (d.promo !== undefined) applyPromo();
+  else if (d.pay !== undefined) pay();
+  else if (d.payorder) payOrder(+d.payorder);
 });
 
 async function load() {
