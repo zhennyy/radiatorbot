@@ -430,7 +430,8 @@ async function getAiRecommendation(userQuery, lang) {
     `Каталог:\n${catalogText}`;
 
   const response = await axios.post(
-    'https://api.anthropic.com/v1/messages',
+    // ANTHROPIC_BASE_URL — свой адрес-посредник для Claude (нужен на серверах в России)
+    (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '') + '/v1/messages',
     {
       model: 'claude-sonnet-5',
       max_tokens: 1500,
