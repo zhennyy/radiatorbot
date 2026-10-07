@@ -10,7 +10,7 @@ const { checkLowStock } = require('./notify');
 const { t } = require('./i18n');
 
 // TELEGRAM_API_ROOT — посредник для Telegram (нужен, если сервер в России)
-const bot = new Telegraf(process.env.BOT_TOKEN, process.env.TELEGRAM_API_ROOT ? { telegram: { apiRoot: process.env.TELEGRAM_API_ROOT } } : {});
+const bot = new Telegraf(process.env.BOT_TOKEN, process.env.TELEGRAM_API_ROOT ? { telegram: { apiRoot: process.env.TELEGRAM_API_ROOT.replace(/\/*$/, '/') } } : {});
 
 // ttl: брошенное оформление само забывается через 30 минут
 const stage = new Scenes.Stage([checkoutScene], { ttl: 30 * 60 });
