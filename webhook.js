@@ -91,7 +91,7 @@ runOnce('2026-10-01-catalog', () => {
 
 function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   const app = express();
-  app.set('trust proxy', true); // за прокси Railway — иначе req.protocol всегда 'http'
+  app.set('trust proxy', 'loopback'); // доверяем только своему nginx на этом же сервере
   app.use(express.json());
   app.use('/uploads', express.static(uploadsDir)); // без авторизации — Telegram должен уметь их скачать
   app.use('/photos', express.static(photosDir, { maxAge: '7d' })); // фото из папки проекта
@@ -237,13 +237,15 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
     if (!query) return res.status(400).json({ error: 'Опишите, что нужно подобрать' });
     if (!aiPick) return res.status(503).json({ error: 'AI-подбор сейчас недоступен' });
     if (Date.now() - (aiLast.get(req.chatId) || 0) < 5000) return res.status(429).json({ error: 'Секунду, ещё думаю над прошлым запросом' });
+    if (aiLast.size > 5000) aiLast.clear();
     aiLast.set(req.chatId, Date.now());
     try {
       const lang = db.getLang(req.chatId);
-      const { adviceText, productIds } = await aiPick(query, lang);
+      const { adviceText, productIds } = await aiPick(query, lang, req.chatId);
       res.json({ advice: adviceText, ids: productIds });
     } catch (e) {
-      console.error('Витрина: AI-подбор не ответил', e.response?.data || e.message);
+      if (e.code === 'AI_LIMIT') return res.status(429).json({ error: db.getLang(req.chatId) === 'en' ? 'AI pick limit reached — try again later' : 'ИИ-подбор на сегодня устал 🙂 Попробуйте позже' });
+      console.error('Витрина: AI-подбор не ответил', e.response?.status || e.message);
       res.status(502).json({ error: t(db.getLang(req.chatId), 'aiError') });
     }
   });
@@ -305,7 +307,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   });
 
   // Фото с телефона: приходит готовый JPEG (витрина сама уменьшает его до 1600 px)
-  app.post('/shop-api/admin/products/:id/photo', express.raw({ type: 'image/*', limit: '10mb' }), ...adm, (req, res) => {
+  app.post('/shop-api/admin/products/:id/photo', ...adm, express.raw({ type: 'image/*', limit: '10mb' }), (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (!db.prepare('SELECT id FROM products WHERE id = ?').get(id)) return res.status(404).json({ error: 'Товар не найден' });
     if (!Buffer.isBuffer(req.body) || req.body.length < 100) return res.status(400).json({ error: 'Файл не получен' });
@@ -476,7 +478,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   app.post('/yookassa-webhook', async (req, res) => {
     const event = req.body;
 
-    if (event && event.event === 'payment.succeeded' && event.object && event.object.id) {
+    if (event && event.event === 'payment.succeeded' && event.object && /^[\w-]{1,64}$/.test(String(event.object.id))) {
       // Не верим уведомлению «на слово»: переспрашиваем платёж у самой ЮKassa.
       // Иначе кто угодно мог бы отправить сюда поддельный «оплачено».
       let payment;
@@ -524,7 +526,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
   setInterval(localizeAllPhotos, 6 * 3600 * 1000);
 
   const port = process.env.WEBHOOK_PORT || 3001;
-  app.listen(port, () =>
+  app.listen(port, process.env.HOST || '127.0.0.1', () =>
     console.log(`Вебхук ЮKassa и веб-админка слушают порт ${port} (/admin)`)
   );
 }

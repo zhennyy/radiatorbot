@@ -382,7 +382,7 @@ bot.on('text', async (ctx, next) => {
 
     const thinkingMsg = await ctx.reply(t(lang, 'aiThinking'));
     try {
-      const { adviceText, productIds } = await getAiRecommendation(query, lang);
+      const { adviceText, productIds } = await getAiRecommendation(query.slice(0, 500), lang, ctx.from.id);
       await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id).catch(() => {});
       await ctx.reply(adviceText || t(lang, 'aiNoRecommendation'));
 
@@ -391,7 +391,9 @@ bot.on('text', async (ctx, next) => {
         if (p) await renderProductCard(ctx, p, lang);
       }
     } catch (err) {
-      console.error('Ошибка AI-консультанта:', err.response?.data || err.message);
+      await ctx.telegram.deleteMessage(ctx.chat.id, thinkingMsg.message_id).catch(() => {});
+      if (err.code === 'AI_LIMIT') return ctx.reply(lang === 'en' ? 'The AI consultant has reached its limit for now — please try again later.' : 'ИИ-консультант на сегодня устал 🙂 Попробуйте позже.');
+      console.error('Ошибка AI-консультанта:', err.response?.status || err.message);
       await ctx.reply(t(lang, 'aiError'));
     }
     return;
@@ -409,7 +411,25 @@ bot.hears([t('ru', 'btnAiPick'), t('en', 'btnAiPick')], (ctx) => {
   ctx.reply(t(lang, 'aiPickPrompt'), buildMainMenu(lang));
 });
 
-async function getAiRecommendation(userQuery, lang) {
+// Лимиты на ИИ, чтобы никто не «накрутил» счёт за Claude:
+// на человека — не больше AI_USER_DAY запросов в сутки, на всех — не больше AI_GLOBAL_HOUR в час.
+const AI_USER_DAY = Number(process.env.AI_USER_DAY || 30);
+const AI_GLOBAL_HOUR = Number(process.env.AI_GLOBAL_HOUR || 200);
+const aiUse = new Map(); // userId -> { day, n }
+let aiHour = { h: 0, n: 0 };
+function aiQuota(userId) {
+  const day = new Date().toISOString().slice(0, 10), h = Math.floor(Date.now() / 3600000);
+  if (aiHour.h !== h) aiHour = { h, n: 0 };
+  const u = aiUse.get(String(userId));
+  const cur = u && u.day === day ? u : { day, n: 0 };
+  if (cur.n >= AI_USER_DAY || aiHour.n >= AI_GLOBAL_HOUR) { const e = new Error('AI_LIMIT'); e.code = 'AI_LIMIT'; throw e; }
+  cur.n++; aiHour.n++;
+  if (aiUse.size > 5000) aiUse.clear(); // раз в сутки ключи всё равно обновятся
+  aiUse.set(String(userId), cur);
+}
+
+async function getAiRecommendation(userQuery, lang, userId = 'chat') {
+  aiQuota(userId);
   const products = db
     .prepare('SELECT id, name, description, price, category, stock FROM products WHERE stock > 0')
     .all();
@@ -435,7 +455,7 @@ async function getAiRecommendation(userQuery, lang) {
     (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '') + '/v1/messages',
     {
       model: 'claude-sonnet-5',
-      max_tokens: 1500,
+      max_tokens: 800,
       system: systemPrompt,
       messages: [{ role: 'user', content: userQuery }],
     },
@@ -448,12 +468,10 @@ async function getAiRecommendation(userQuery, lang) {
     }
   );
 
-  console.log('AI-консультант, полный response.data:', JSON.stringify(response.data));
   // ответ модели может содержать служебный блок "thinking" перед текстом —
   // берём именно блок с type === 'text', а не первый элемент массива
   const textBlock = response.data.content?.find((b) => b.type === 'text');
   const raw = textBlock?.text || '';
-  console.log('AI-консультант, сырой ответ:', raw);
 
   // ищем строку с рекомендациями в любом месте текста (не только в самом конце)
   const match = raw.match(/РЕКОМЕНДАЦИИ:\s*([^\n]*)/i);
@@ -461,7 +479,8 @@ async function getAiRecommendation(userQuery, lang) {
   let adviceText = raw.trim();
 
   if (match) {
-    productIds = [...match[1].matchAll(/(\d+)/g)].map((m) => parseInt(m[1], 10));
+    const allowed = new Set(products.map((p) => p.id)); // только товары из каталога, который видел ИИ
+    productIds = [...new Set([...match[1].matchAll(/(\d+)/g)].map((m) => parseInt(m[1], 10)))].filter((id) => allowed.has(id)).slice(0, 3);
     adviceText = raw.slice(0, match.index).trim();
   }
 
@@ -573,7 +592,7 @@ async function showMyOrders(ctx) {
     const statusLabel = t(lang, 'orderStatus')[statusKey] || statusKey;
     const items = itemsStmt.all(o.id);
     const itemsText = items
-      .map((i) => `• ${(lang === 'en' && i.name_en) || i.name} ×${i.quantity}`)
+      .map((i) => `• ${escapeHtml((lang === 'en' && i.name_en) || i.name)} ×${i.quantity}`)
       .join('\n');
     const date = (o.created_at || '').slice(0, 16).replace('T', ' ');
     const cityDisplay = db.translateCity(o.delivery_city, lang);
@@ -582,10 +601,10 @@ async function showMyOrders(ctx) {
     text += `${statusLabel}\n\n`;
     text += `${itemsText}\n\n`;
     if (o.discount_percent > 0) {
-      text += `${t(lang, 'promoLine', o.promo_code, o.discount_percent)}\n`;
+      text += `${t(lang, 'promoLine', escapeHtml(o.promo_code || ''), o.discount_percent)}\n`;
     }
     if (o.delivery_cost > 0) {
-      text += `${t(lang, 'deliveryLine', cityDisplay, formatPrice(o.delivery_cost))}\n`;
+      text += `${t(lang, 'deliveryLine', escapeHtml(cityDisplay || ''), formatPrice(o.delivery_cost))}\n`;
     } else if (o.delivery_city === null && (o.address === 'Самовывоз' || o.address === 'Pickup')) {
       text += `${t(lang, 'pickupLine')}\n`;
     }
@@ -790,7 +809,7 @@ if (SHOP_URL) {
 const { startWebhookServer } = require('./webhook');
 startWebhookServer(bot, {
   // AI-подбор из витрины — тот же консультант, что и в чате
-  aiPick: (query, lang) => getAiRecommendation(query, lang),
+  aiPick: (query, lang, userId) => getAiRecommendation(query, lang, userId),
   // витрина просит показать корзину в чате — используем ту же функцию, что и кнопка «🛒 Корзина»
   showCartFor: (chatId) =>
     showCart({ chat: { id: chatId }, reply: (text, extra) => bot.telegram.sendMessage(chatId, text, extra) }),

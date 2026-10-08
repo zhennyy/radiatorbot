@@ -206,13 +206,17 @@ async function markPaid(bot, orderId, paymentId) {
   const own = o.payment_id || (String(o.status).startsWith('awaiting_payment:') ? String(o.status).slice(17) : null);
   if (!paymentId || own !== paymentId) return false;           // это не платёж этого заказа
   const wasCancelled = o.base === 'cancelled';
-  let short = [];
+  let short = [], promoOver = null;
   const done = db.transaction(() => {
     o = getOrder(orderId);                                       // перечитали внутри транзакции
     if (o.paid_at) return false;
     short = takeStock(o);
     db.prepare("UPDATE orders SET status = 'paid', status_at = datetime('now'), paid_at = datetime('now') WHERE id = ?").run(orderId);
-    if (o.promo_code) db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE code = ?').run(o.promo_code);
+    if (o.promo_code) {
+      db.prepare('UPDATE promo_codes SET used_count = used_count + 1 WHERE code = ?').run(o.promo_code);
+      const pc = db.prepare('SELECT used_count, max_uses FROM promo_codes WHERE code = ?').get(o.promo_code);
+      if (pc && pc.max_uses !== null && pc.used_count > pc.max_uses) promoOver = `${o.promo_code} (${pc.used_count}/${pc.max_uses})`;
+    }
     return true;
   })();
   if (!done) return false;
@@ -220,6 +224,7 @@ async function markPaid(bot, orderId, paymentId) {
   await notifyBuyer(bot, paid);
   await notifyOwnerNew(bot, paid);
   await warnShortage(bot, paid, short);
+  if (promoOver && ownerId()) await bot.telegram.sendMessage(ownerId(), `⚠️ Промокод ${promoOver} превысил лимит использований — заказ № ${paid.code} оплачен со скидкой.`).catch(() => {});
   if (wasCancelled && ownerId()) {
     await bot.telegram.sendMessage(ownerId(), `⚠️ Заказ № ${paid.code} был отменён, но покупатель всё-таки оплатил — вернула его в работу.`).catch(() => {});
   }
