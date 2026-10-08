@@ -432,7 +432,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
       const code = db.prepare('SELECT order_code FROM orders WHERE id = ?').get(orderId).order_code || String(orderId);
 
       const { createPayment } = require('./payments/yookassa');
-      const payment = await createPayment(orderId, finalTotal / 100, `Заказ #${code}`);
+      const payment = await createPayment(orderId, finalTotal / 100, `Заказ #${code} в RadiatorPro`);
       db.prepare('UPDATE orders SET status = ?, payment_id = ? WHERE id = ?').run(`awaiting_payment:${payment.id}`, payment.id, orderId);
       db.prepare('DELETE FROM cart_items WHERE chat_id = ?').run(chatId); // корзина превратилась в заказ
       const url = payment.confirmation.confirmation_url;
