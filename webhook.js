@@ -27,10 +27,22 @@ const isLocalPhoto = (url) => {
   return Boolean(m) && fs.existsSync(path.join(m[1] === 'photos' ? photosDir : uploadsDir, m[2]));
 };
 
+// Защита от SSRF: не ходим по ссылкам во внутреннюю сеть (localhost, 10.x, 192.168.x, 169.254.x — метаданные облака и т.п.)
+const isPrivateIp = (ip) => {
+  if (ip.includes(':')) return /^(::1?|fe80|fc|fd|::ffff:(127|10|192\.168|169\.254|172\.(1[6-9]|2\d|3[01]))\.)/i.test(ip);
+  const [a, b] = ip.split('.').map(Number);
+  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+};
+async function assertPublicUrl(url) {
+  const host = new URL(url).hostname.replace(/^\[|\]$/g, '');
+  const addrs = require('net').isIP(host) ? [{ address: host }] : await require('dns').promises.lookup(host, { all: true });
+  if (!addrs.length || addrs.some((x) => isPrivateIp(x.address))) throw new Error('ссылка ведёт во внутреннюю сеть');
+}
 async function localizePhoto(id, url) {
   if (!url || isLocalPhoto(url) || !/^https?:\/\//i.test(url) || !PUBLIC_BASE) return false;
+  await assertPublicUrl(url);
   const r = await require('axios').get(url, {
-    responseType: 'arraybuffer', timeout: 20000, maxContentLength: 15 * 1024 * 1024,
+    responseType: 'arraybuffer', timeout: 20000, maxContentLength: 15 * 1024 * 1024, maxRedirects: 0,
     headers: { 'User-Agent': 'Mozilla/5.0 (RadiatorPro shop)', Accept: 'image/*' },
   });
   const type = String(r.headers['content-type'] || '');
@@ -156,8 +168,9 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
         }
         let url = p.photo_url;
         if (!/^https?:\/\//i.test(url)) url = await bot.telegram.getFileLink(url).then(String); // file_id из Telegram
+        else await assertPublicUrl(url); // не даём ходить по внутренним адресам сервера
         const r = await axios.get(url, {
-          responseType: 'arraybuffer', timeout: 10000, maxContentLength: 10 * 1024 * 1024,
+          responseType: 'arraybuffer', timeout: 10000, maxContentLength: 10 * 1024 * 1024, maxRedirects: 0,
           headers: { 'User-Agent': 'Mozilla/5.0 (RadiatorPro shop)', Accept: 'image/*' },
         });
         const type = String(r.headers['content-type'] || '');
@@ -527,7 +540,7 @@ function startWebhookServer(bot, { showCartFor, aiPick } = {}) {
 
   const port = process.env.WEBHOOK_PORT || 3001;
   app.listen(port, process.env.HOST || '127.0.0.1', () =>
-    console.log(`Вебхук ЮKassa и веб-админка слушают порт ${port} (/admin)`)
+    console.log(`Вебхук ЮKassa и магазин слушают порт ${port}`)
   );
 }
 

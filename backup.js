@@ -46,7 +46,7 @@ const csv = (rows) => {
   const cols = Object.keys(rows[0]);
   const cell = (v) => {
     let s = v == null ? '' : String(v);
-    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = "'" + s; // защита от формул в Excel
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s) && !/^[+\-]?[\d\s().-]+$/.test(s)) s = "'" + s; // защита от формул в Excel (телефоны не трогаем)
     return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   // «;» и BOM — чтобы Excel на Mac/Windows сразу открыл кириллицу по столбцам
