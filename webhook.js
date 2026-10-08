@@ -11,7 +11,7 @@ const { getPayment } = require('./payments/yookassa');
 const orders = require('./orders');
 const { sendToBuyer } = require('./chat');
 
-// фото товаров храним рядом с базой — на Railway это подключённый Volume,
+// фото товаров храним рядом с базой — на сервере это /data/<бот>,
 // так что файлы переживают редеплой (в отличие от остальной файловой системы)
 const dbDir = path.dirname(path.resolve(process.env.DB_PATH || 'shop.db'));
 const uploadsDir = path.join(dbDir, 'uploads');
@@ -19,7 +19,7 @@ const uploadsDir = path.join(dbDir, 'uploads');
 const photosDir = path.join(__dirname, 'photos');
 fs.mkdirSync(uploadsDir, { recursive: true });
 
-// ===== Все фото товаров храним у себя: папка uploads на постоянном диске Railway =====
+// ===== Все фото товаров храним у себя: папка uploads рядом с базой (/data/<бот>/uploads) =====
 // Если у товара ссылка на чужой сайт — скачиваем картинку один раз и дальше показываем свою копию.
 const PUBLIC_BASE = process.env.PUBLIC_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : '');
 const isLocalPhoto = (url) => {

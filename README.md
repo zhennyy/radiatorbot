@@ -51,7 +51,7 @@ npm start
 
 Если в консоли всё зелёное и без ошибок — бот и вебхук-сервер запущены. Иди в Telegram, жми `/start`.
 
-Локально бот живёт, пока открыт терминал. Для круглосуточной работы он задеплоен на [Railway](https://railway.app) — переменные окружения там задаются в настройках проекта, а `shop.db` лежит на подключённом Volume, чтобы не стираться при каждом деплое.
+Локально бот живёт, пока открыт терминал. Круглосуточно он работает на своём сервере (VPS): код в `/opt/bots/radiatorbot`, база и фото в `/data/radiatorbot` (обновления их не трогают, каждую ночь — резервная копия), ключи — командой `bfa env radiatorbot`, магазин — `https://radiator.botforall.ru/shop/`. Вебхук ЮKassa общий для всех магазинов: `https://botforall.ru/yookassa-webhook`. Установка сервера — в [BotForAll/deploy/README.md](https://github.com/zhennyy/botforall/blob/main/deploy/README.md).
 
 ## 💬 Команды бота
 

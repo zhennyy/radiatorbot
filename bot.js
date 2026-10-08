@@ -32,7 +32,7 @@ function formatPrice(kopecks) {
 // чтобы она не пропадала, даже если Telegram-клиент её случайно скрыл.
 // Покупатель может переключить язык интерфейса кнопкой "🌐 Язык / Language" —
 // эта кнопка и её обработчики распознают нажатие независимо от текущего языка.
-// Адрес витрины: SHOP_URL из переменных или публичный домен Railway (он задаётся автоматически)
+// Адрес витрины: SHOP_URL из .env (на сервере — https://<бот>.botforall.ru/shop/); RAILWAY_PUBLIC_DOMAIN — запасной вариант для облачных хостингов
 const SHOP_URL =
   process.env.SHOP_URL ||
   (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/shop/` : null);
