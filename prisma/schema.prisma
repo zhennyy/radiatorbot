@@ -1,0 +1,124 @@
+// Схема базы RadiatorPro для Prisma.
+// Таблицы уже существуют (SQLite), поэтому имена полей совпадают с колонками в базе,
+// а сама структура меняется SQL-миграциями из prisma/migrations (их запускает src/database/migrations.js).
+// Связей между моделями нет намеренно: товар можно удалить, а старые заказы с ним должны остаться.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/database/generated"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Product {
+  id             Int     @id @default(autoincrement())
+  name           String
+  description    String?
+  price          Int // в копейках
+  photo_url      String?
+  stock          Int     @default(0)
+  category       String?
+  name_en        String?
+  description_en String?
+  category_en    String?
+
+  @@map("products")
+}
+
+model CartItem {
+  chat_id    Int
+  product_id Int
+  quantity   Int @default(1)
+
+  @@id([chat_id, product_id])
+  @@map("cart_items")
+}
+
+model Order {
+  id               Int     @id @default(autoincrement())
+  chat_id          Int
+  status           String  @default("pending") // pending | awaiting_payment:<id платежа> | paid | assembling | shipped | delivered | cancelled
+  total            Int
+  address          String?
+  payment_provider String?
+  order_code       String?
+  created_at       String? @default(dbgenerated("CURRENT_TIMESTAMP"))
+  promo_code       String?
+  discount_percent Int     @default(0)
+  delivery_city    String?
+  delivery_cost    Int     @default(0)
+  track            String?
+  rating           Int?
+  status_at        String?
+  status_msg_id    Int?
+  payment_id       String?
+  paid_at          String?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          Int @id @default(autoincrement())
+  order_id    Int
+  product_id  Int
+  quantity    Int
+  price       Int
+  stock_taken Int @default(0) // сколько реально списали со склада — столько и вернём при отмене
+
+  @@index([order_id], map: "order_items_order")
+  @@map("order_items")
+}
+
+model PromoCode {
+  id               Int     @id @default(autoincrement())
+  code             String  @unique
+  discount_percent Int
+  active           Int     @default(1)
+  max_uses         Int?
+  used_count       Int     @default(0)
+  created_at       String? @default(dbgenerated("CURRENT_TIMESTAMP"))
+
+  @@map("promo_codes")
+}
+
+model DeliveryRate {
+  id         Int     @id @default(autoincrement())
+  city       String  @unique // COLLATE NOCASE в базе
+  city_en    String?
+  price      Int
+  active     Int     @default(1)
+  created_at String? @default(dbgenerated("CURRENT_TIMESTAMP"))
+
+  @@map("delivery_rates")
+}
+
+model UserSettings {
+  chat_id Int     @id
+  lang    String  @default("ru")
+  name    String?
+
+  @@map("user_settings")
+}
+
+model Setting {
+  key   String @id
+  value String // JSON
+
+  @@map("settings")
+}
+
+model Message {
+  id           Int     @id @default(autoincrement())
+  chat_id      Int
+  from_owner   Int     @default(0)
+  text         String?
+  photo        String? // file_id фото в Telegram
+  owner_msg_id Int? // id копии сообщения у владелицы (чтобы ответить реплаем)
+  is_read      Int     @default(0)
+  created_at   String? @default(dbgenerated("CURRENT_TIMESTAMP"))
+
+  @@index([chat_id, id], map: "messages_chat")
+  @@map("messages")
+}

@@ -2,19 +2,29 @@
   "name": "radiator-shop-bot",
   "version": "1.0.0",
   "private": true,
-  "main": "bot.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node index.js",
+    "test": "node --test --test-force-exit \"src/**/test.js\"",
+    "postinstall": "node scripts/generate-prisma-client.js",
+    "db:generate": "node scripts/generate-prisma-client.js"
   },
   "dependencies": {
+    "@prisma/adapter-better-sqlite3": "7.10.0",
+    "@prisma/client": "7.10.0",
     "axios": "^1.7.7",
     "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "prisma": "7.10.0",
     "telegraf": "^4.16.3",
     "uuid": "^11.1.1"
   },
   "engines": {
-    "node": "20.x"
+    "node": ">=22.12"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0",
+    "mysql2": "^3.23.1"
   }
 }
