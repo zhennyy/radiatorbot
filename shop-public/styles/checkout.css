@@ -1,0 +1,10 @@
+/* Оформление заказа: способ получения, поля, промокод, итог */
+.co .box{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px}
+.co .box h3{margin:0 0 10px;font-size:15px}
+.co select,.co input,.co textarea{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;outline:0}
+.co textarea{min-height:64px;resize:vertical}
+.co .fld{margin-top:10px}
+.co .promo{display:flex;gap:8px} .co .promo .btn{width:auto;padding:0 16px}
+.co .sumrow{display:flex;justify-content:space-between;padding:4px 0;color:var(--muted)}
+.co .sumrow.big{color:var(--text);font-weight:800;font-size:19px;border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+.co .ok{color:var(--ok)}

@@ -1,0 +1,7 @@
+/* Шторка товара: наличие, цена и кнопка «В корзину» */
+.sheet .stock{font-size:14px;font-weight:600;margin-bottom:16px}
+.sheet .act{display:flex;align-items:center;gap:12px}
+.sheet .act .price{font-size:24px;flex:1}
+.sheet .act .add{width:auto;padding:0 20px;height:48px;font-size:16px;font-weight:700;border-radius:14px}
+.sheet .act .step{height:48px;border-radius:14px}
+.sheet .act .step button{width:44px;height:48px;font-size:24px}

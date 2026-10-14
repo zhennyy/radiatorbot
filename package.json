@@ -7,7 +7,8 @@
     "start": "node index.js",
     "test": "node --test --test-force-exit \"src/**/test.js\"",
     "postinstall": "node scripts/generate-prisma-client.js",
-    "db:generate": "node scripts/generate-prisma-client.js"
+    "db:generate": "node scripts/generate-prisma-client.js",
+    "test:ui": "node tools/ui-smoke-test.js"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "7.10.0",
@@ -26,5 +27,8 @@
   "overrides": {
     "deepmerge-ts": "^8.0.0",
     "mysql2": "^3.23.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
   }
 }

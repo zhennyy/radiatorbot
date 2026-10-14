@@ -1,0 +1,45 @@
+/* Админка: меню разделов, списки, формы (товар, настройки), заказы владелицы */
+.chips.adm{padding-top:0;margin-bottom:10px}
+.chips.adm em,.cr .badge{font-style:normal;background:var(--accent);color:#fff;border-radius:9px;font-size:11px;font-weight:700;padding:1px 6px;margin-left:6px}
+.chips.adm em:empty{display:none}
+.chips.small{padding:0 0 10px} .chips.small .chip{padding:7px 12px;font-size:13px}
+
+.aline{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:16px;padding:10px;margin-bottom:8px;cursor:pointer}
+.aline .thumb{width:56px;height:56px;border-radius:12px;overflow:hidden;background:var(--photo);display:grid;place-items:center;flex:none}
+.aline .thumb img{width:100%;height:100%;object-fit:cover} .aline .thumb .noimg{font-size:22px}
+.aline .mid{flex:1;min-width:0} .aline .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aline .s{font-size:13px;color:var(--muted);margin-top:3px}
+.aline .s .warn{color:var(--accent);font-weight:600}
+
+/* формы; порядок важен: .crow input и .sw input ниже .form input и перекрывают его */
+.form label{display:block;font-size:13px;color:var(--muted);margin:12px 0 5px}
+.form input,.form textarea{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;outline:0}
+.form textarea{min-height:76px;resize:vertical}
+.form .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form details{margin-top:12px} .form summary{color:var(--muted);font-size:14px;cursor:pointer}
+.form .actions{display:flex;gap:10px;margin-top:16px}
+.form .line2{display:flex;justify-content:space-between;align-items:center;color:var(--text);font-size:15px;margin:16px 0 8px}
+.photoEdit{position:relative}
+.photoEdit .up{position:absolute;right:12px;bottom:12px;border:0;border-radius:12px;background:rgba(0,0,0,.6);color:#fff;padding:10px 14px;font-weight:700;cursor:pointer}
+
+.crow,.prow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.crow input{padding:9px 10px} .crow .cn{flex:2;min-width:0} .crow .cp{flex:none;width:78px}
+.crow .rub{color:var(--muted);font-size:14px;margin-left:-4px}
+.crow.off .cn,.crow.off .cp,.prow.off .mid{opacity:.45}
+.prow .mid{flex:1;min-width:0} .prow .s{font-size:12.5px;color:var(--muted);margin-top:2px}
+.sw{position:relative;display:inline-block;width:44px;height:26px;flex:none}
+.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw i{position:absolute;inset:0;background:var(--line);border-radius:13px;transition:.2s;cursor:pointer}
+.sw i::after{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sw input:checked+i{background:var(--ok)} .sw input:checked+i::after{transform:translateX(18px)}
+.two3{display:grid;grid-template-columns:1.6fr .8fr 1fr;gap:8px;margin-top:6px}
+.form .two3 input,.form .crow input{width:100%}
+.form .crow .cp{width:78px} /* иначе правило выше растягивает цену и строка вылезает за экран */
+
+/* заказы владелицы */
+.contact{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.oact{display:flex;gap:8px;margin-top:10px}
+.oact .btn{padding:12px;font-size:15px;border-radius:13px}
+.oact .btn.small{width:auto;flex:none;padding:12px 14px;font-size:14px}
+.order.flash{animation:fl 1.6s ease}
+@keyframes fl{0%,40%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:none}}

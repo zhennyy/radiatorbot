@@ -142,7 +142,23 @@ const recentOrders = await database.order.findMany({ where: { chat_id: chatId },
 - Клиент Prisma генерируется автоматически после `npm install` (`npm run db:generate` — вручную).
 - Несколько изменений, которые должны пройти вместе (оплата и склад, создание заказа), оборачиваются в `runInTransaction(...)`.
 
-`shop-public/index.html` — мини-приложение магазина и админка одним файлом, без сборки.
+### Мини-приложение
+
+Витрина и админка владелицы — `shop-public/`, без сборщика: браузер грузит ES-модули, сервер отдаёт папку как есть (`/shop`).
+
+```
+shop-public/
+  index.html   — только разметка; подключает styles/*.css и scripts/main.js
+  styles/      — base.css (цвета, светлая/тёмная тема, кнопки) + по файлу на раздел
+  scripts/
+    main.js, navigation.js        — запуск, вкладки, кнопки Telegram (MainButton/BackButton)
+    api.js, state.js, i18n.js, telegram.js — запросы к /shop-api, общее состояние, тексты RU/EN, Telegram SDK
+    utils/                        — форматирование цен и дат, экранирование, тосты, делегирование кликов (data-action)
+    catalog/, cart/, checkout/, orders/, ai/ — разделы покупателя
+    admin/                        — products/, orders/, stats/, chats/, settings/
+```
+
+Кнопки в разметке помечены `data-action="…"`; обработчики регистрируются по имени, слушатель кликов один. Проверка в браузере: `npm run test:ui` (Playwright, скриншоты всех экранов покупателя и владелицы; `-- --compare <папка>` сравнивает с прошлым прогоном).
 
 ### Безопасность
 
