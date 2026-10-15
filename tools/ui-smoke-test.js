@@ -43,14 +43,20 @@ async function main() {
   console.log(`Экранов: ${report.screens.length} → ${outputDir}`);
   console.log(`Проверки: ${report.checks.filter((item) => item.passed).length}/${report.checks.length} пройдено`);
   console.log(`Ошибки консоли: ${report.consoleErrors.length}`, report.consoleErrors);
-  console.log(`Ожидаемые ошибки сети (битое фото, фото из чата, 401 вне Telegram): ${report.expectedNetworkErrors.length}`);
+  console.log(
+    `Ожидаемые ошибки сети (битое фото, фото из чата, 401 вне Telegram): ${report.expectedNetworkErrors.length}`,
+  );
   let failed = report.consoleErrors.length > 0 || report.checks.some((item) => !item.passed);
   if (compareDir) {
     const results = await compareScreens(browser, outputDir, compareDir);
     const mismatches = results.filter((item) => item.status !== 'совпадает');
     const noisy = results.filter((item) => item.noisePixels);
-    console.log(`Сравнение с ${compareDir}: совпало ${results.length - mismatches.length} из ${results.length}`
-      + (noisy.length ? ` (из них ${noisy.length} с шумом сглаживания: ${noisy.map((item) => `${item.file} ${item.noisePixels} пикс.`).join(', ')})` : ''));
+    console.log(
+      `Сравнение с ${compareDir}: совпало ${results.length - mismatches.length} из ${results.length}` +
+        (noisy.length
+          ? ` (из них ${noisy.length} с шумом сглаживания: ${noisy.map((item) => `${item.file} ${item.noisePixels} пикс.`).join(', ')})`
+          : ''),
+    );
     mismatches.forEach((item) => console.log('  ✗', item.file, item.status));
     failed = failed || mismatches.length > 0;
   }
@@ -58,4 +64,7 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-main().catch((error) => { console.error(error); process.exit(1); });
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

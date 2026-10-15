@@ -18,16 +18,20 @@ const ORDER_FILTERS = [
 const TRACK_FOCUS_DELAY_MS = 250; // после анимации шторки
 
 const findFilter = (filterName) => ORDER_FILTERS.find(([name]) => name === filterName);
-const findOrder = (orderId) => adminState.orders.find((order) => order.id == orderId);
+const findOrder = (orderId) => adminState.orders.find((order) => order.id === Number(orderId));
 
 export function renderAdminOrders() {
   const countFor = (filterName) => adminState.orders.filter(findFilter(filterName)[2]).length;
   const matchesFilter = (findFilter(adminState.orderFilter) || ORDER_FILTERS[0])[2];
   const orders = adminState.orders.filter(matchesFilter);
-  const filterChips = ORDER_FILTERS.map(([name, label]) => `<button class="chip ${adminState.orderFilter === name ? 'on' : ''}" data-action="filter-orders" data-filter="${name}">${label}${name !== 'all' && countFor(name) ? ` · ${countFor(name)}` : ''}</button>`).join('');
+  const filterChips = ORDER_FILTERS.map(
+    ([name, label]) =>
+      `<button class="chip ${adminState.orderFilter === name ? 'on' : ''}" data-action="filter-orders" data-filter="${name}">${label}${name !== 'all' && countFor(name) ? ` · ${countFor(name)}` : ''}</button>`,
+  ).join('');
   const emptyText = adminState.orderFilter === 'active' ? 'Сейчас нет заказов в работе' : 'Здесь пока пусто';
-  getElement('admBody').innerHTML = `<div class="chips small">${filterChips}</div>`
-    + (orders.length ? orders.map(adminOrderCardHtml).join('') : `<div class="empty"><b>📦</b>${emptyText}</div>`);
+  getElement('admBody').innerHTML =
+    `<div class="chips small">${filterChips}</div>` +
+    (orders.length ? orders.map(adminOrderCardHtml).join('') : `<div class="empty"><b>📦</b>${emptyText}</div>`);
 }
 
 /** Шторка трек-номера. purpose: 'ship' — отправка заказа, 'track' — только поправить трек */
@@ -49,7 +53,10 @@ function openTrackSheet(orderId, purpose) {
 /** Сменить статус. Курьерский заказ при отправке сначала спрашивает трек-номер (trackEntered — уже спросили). */
 async function changeOrderStatus(orderId, status, track, trackEntered) {
   const order = findOrder(orderId);
-  if (status === 'shipped' && order && !order.pickup && !trackEntered) { openTrackSheet(orderId, 'ship'); return; }
+  if (status === 'shipped' && order && !order.pickup && !trackEntered) {
+    openTrackSheet(orderId, 'ship');
+    return;
+  }
   if (status === 'cancelled') {
     const question = IN_WORK_STATUSES.includes(order?.status)
       ? 'Отменить заказ? Товар вернётся на склад. Деньги покупателю верните в кабинете ЮKassa.'
@@ -57,16 +64,28 @@ async function changeOrderStatus(orderId, status, track, trackEntered) {
     if (!(await confirmAction(question))) return;
   }
   try {
-    const updated = await callApi(`/admin/orders/${orderId}/status`, track !== undefined ? { status, track } : { status }, 1);
-    if (order) { order.status = updated.status; order.track = updated.track; }
+    const updated = await callApi(
+      `/admin/orders/${orderId}/status`,
+      track !== undefined ? { status, track } : { status },
+      1,
+    );
+    if (order) {
+      order.status = updated.status;
+      order.track = updated.track;
+    }
     renderAdminOrders();
     vibrate('medium');
     showToast(status === 'awaiting_payment' ? 'Статус обновлён ✓' : 'Готово — покупателю отправлено уведомление ✓');
-  } catch (error) { showToast(error.message); }
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 export const adminOrderActions = {
-  'filter-orders': (element) => { adminState.orderFilter = element.dataset.filter; renderAdminOrders(); },
+  'filter-orders': (element) => {
+    adminState.orderFilter = element.dataset.filter;
+    renderAdminOrders();
+  },
   'change-order-status': (element) => changeOrderStatus(Number(element.dataset.orderId), element.dataset.status),
   'edit-track': (element) => openTrackSheet(Number(element.dataset.orderId), 'track'),
 };

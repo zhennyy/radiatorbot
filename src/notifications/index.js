@@ -18,13 +18,21 @@ async function checkLowStock(bot, piecesThreshold = LOW_STOCK_PIECES) {
   await setSetting(SIGNATURE_SETTING_KEY, signature);
   if (!lowStockProducts.length) return;
 
-  const text = lowStockProducts.map((product) => (product.stock <= 0
-    ? `⛔️ ${product.name} — закончился`
-    : `⚠️ ${product.name} — осталось ${product.stock} шт.`)).join('\n');
+  const text = lowStockProducts
+    .map((product) =>
+      product.stock <= 0 ? `⛔️ ${product.name} — закончился` : `⚠️ ${product.name} — осталось ${product.stock} шт.`,
+    )
+    .join('\n');
   const { shopUrl } = require('../orders');
   const productsAdminUrl = shopUrl({ tab: 'admin', adm: 'products' });
-  await bot.telegram.sendMessage(ownerChatId, `📦 Заканчивается на складе:\n${text}`,
-    productsAdminUrl ? { reply_markup: { inline_keyboard: [[{ text: '⚙️ Обновить остатки', web_app: { url: productsAdminUrl } }]] } } : {})
+  await bot.telegram
+    .sendMessage(
+      ownerChatId,
+      `📦 Заканчивается на складе:\n${text}`,
+      productsAdminUrl
+        ? { reply_markup: { inline_keyboard: [[{ text: '⚙️ Обновить остатки', web_app: { url: productsAdminUrl } }]] } }
+        : {},
+    )
     .catch((sendError) => console.error('Склад: не получилось предупредить владелицу', sendError.message));
 }
 

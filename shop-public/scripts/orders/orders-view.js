@@ -12,10 +12,12 @@ function progressStepsHtml(order) {
     ? ['Paid', 'Packing', order.pickup ? 'Ready' : 'Shipped', order.pickup ? 'Picked up' : 'Delivered']
     : ['Оплачен', 'Собираем', order.pickup ? 'Готов' : 'Отправлен', order.pickup ? 'Получен' : 'Доставлен'];
   const LAST_STEP = 3;
-  return `<div class="steps">${names.map((name, index) => {
-    const stepClass = index < order.step || order.step === LAST_STEP ? 'done' : index === order.step ? 'now' : '';
-    return `<div class="${stepClass}">${name}</div>`;
-  }).join('')}</div>`;
+  return `<div class="steps">${names
+    .map((name, index) => {
+      const stepClass = index < order.step || order.step === LAST_STEP ? 'done' : index === order.step ? 'now' : '';
+      return `<div class="${stepClass}">${name}</div>`;
+    })
+    .join('')}</div>`;
 }
 
 /** «Название × 2» */
@@ -43,6 +45,9 @@ export async function loadOrders() {
     view.innerHTML = `<h1>${texts().ordersTitle}</h1><div class="empty">${escapeHtml(error.message)}</div>`;
     return;
   }
-  view.innerHTML = `<h1>${texts().ordersTitle}</h1>`
-    + (state.orders.length ? state.orders.map(orderHtml).join('') : `<div class="empty"><b>📦</b>${texts().ordersEmpty}</div>`);
+  view.innerHTML =
+    `<h1>${texts().ordersTitle}</h1>` +
+    (state.orders.length
+      ? state.orders.map(orderHtml).join('')
+      : `<div class="empty"><b>📦</b>${texts().ordersEmpty}</div>`);
 }

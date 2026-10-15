@@ -16,17 +16,21 @@ const cartLineHtml = ({ product, quantity }) => `
         ${quantityStepperHtml(product, quantity)}
       </div>`;
 
-const emptyCartHtml = () => `<div class="empty"><b>🛒</b>${texts().cartEmpty}<br><br><button class="btn ghost" data-action="switch-tab" data-tab="catalog">${texts().toCatalog}</button></div>`;
+const emptyCartHtml = () =>
+  `<div class="empty"><b>🛒</b>${texts().cartEmpty}<br><br><button class="btn ghost" data-action="switch-tab" data-tab="catalog">${texts().toCatalog}</button></div>`;
 
 export function renderCart() {
   const { itemCount, sum } = cartTotals();
   getElement('cartCount').textContent = itemCount || '';
   const lines = cartLines();
   // в Telegram вместо кнопки «Оформить» — системная MainButton
-  const content = lines.length ? lines.map(cartLineHtml).join('') + `
+  const content = lines.length
+    ? lines.map(cartLineHtml).join('') +
+      `
       <div class="total"><span>${texts().total}</span><b>${formatRubles(sum)}</b></div>
       ${isInsideTelegram ? '' : `<button class="btn" data-action="open-checkout">${texts().checkout(formatRubles(sum))}</button>`}
-      <div class="note">${texts().checkoutNote}</div>` : emptyCartHtml();
+      <div class="note">${texts().checkoutNote}</div>`
+    : emptyCartHtml();
   getElement('v-cart').innerHTML = `<h1>${texts().cartTitle}</h1>` + content;
   updateMainButton();
 }

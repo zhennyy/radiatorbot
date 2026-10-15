@@ -9,7 +9,12 @@ const MAX_CITY_LENGTH = 80;
 const MAX_ADDRESS_LENGTH = 300;
 const MIN_ADDRESS_LENGTH = 5;
 
-const normalizeName = (text) => String(text || '').trim().toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ');
+const normalizeName = (text) =>
+  String(text || '')
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/\s+/g, ' ');
 const normalizePromoCode = (code) => normalizeName(code).toUpperCase().replace(/\s+/g, '');
 
 // Ошибка с текстом для покупателя (400), а не внутренняя
@@ -19,8 +24,16 @@ const userError = (message) => Object.assign(new Error(message), { expose: true,
 async function findCity(cityName) {
   const normalizedCity = normalizeName(cityName);
   if (!normalizedCity) return null;
-  const activeRates = await database.deliveryRate.findMany({ where: { active: 1 }, select: { city: true, city_en: true, price: true } });
-  return activeRates.find((rate) => normalizeName(rate.city) === normalizedCity || (rate.city_en && normalizeName(rate.city_en) === normalizedCity)) || null;
+  const activeRates = await database.deliveryRate.findMany({
+    where: { active: 1 },
+    select: { city: true, city_en: true, price: true },
+  });
+  return (
+    activeRates.find(
+      (rate) =>
+        normalizeName(rate.city) === normalizedCity || (rate.city_en && normalizeName(rate.city_en) === normalizedCity),
+    ) || null
+  );
 }
 
 async function getDeliveryPrice(cityName) {
@@ -37,7 +50,8 @@ async function findPromo(code) {
   const activePromoCodes = await database.promoCode.findMany({ where: { active: 1 } });
   const promoCode = activePromoCodes.find((candidate) => normalizePromoCode(candidate.code) === normalizedCode);
   if (!promoCode) throw promoError('Такого промокода нет', 'notFound');
-  if (promoCode.max_uses !== null && promoCode.used_count >= promoCode.max_uses) throw promoError('Промокод уже закончился', 'exhausted');
+  if (promoCode.max_uses !== null && promoCode.used_count >= promoCode.max_uses)
+    throw promoError('Промокод уже закончился', 'exhausted');
   return { code: promoCode.code, percent: promoCode.discount_percent };
 }
 
@@ -59,8 +73,12 @@ async function resolveDelivery({ method, city, address }, goodsTotal, discountPe
     if (!(await getDeliverySettings()).pickup) throw userError('Самовывоза сейчас нет — выберите доставку');
     fullAddress = translate(language, 'pickupSet');
   } else {
-    const cityName = String(city || '').trim().slice(0, MAX_CITY_LENGTH);
-    const streetAddress = String(address || '').trim().slice(0, MAX_ADDRESS_LENGTH);
+    const cityName = String(city || '')
+      .trim()
+      .slice(0, MAX_CITY_LENGTH);
+    const streetAddress = String(address || '')
+      .trim()
+      .slice(0, MAX_ADDRESS_LENGTH);
     if (!cityName) throw userError('Выберите город');
     if (streetAddress.length < MIN_ADDRESS_LENGTH) throw userError('Укажите адрес: улица, дом, квартира');
     const knownCity = await findCity(cityName);
@@ -68,7 +86,13 @@ async function resolveDelivery({ method, city, address }, goodsTotal, discountPe
     fullAddress = `${deliveryCity}, ${streetAddress}`;
   }
   const priceQuote = await quote(goodsTotal, discountPercent, deliveryCity);
-  return { deliveryCity, address: fullAddress, delivery: priceQuote.delivery, goods: priceQuote.goods, total: priceQuote.total };
+  return {
+    deliveryCity,
+    address: fullAddress,
+    delivery: priceQuote.delivery,
+    goods: priceQuote.goods,
+    total: priceQuote.total,
+  };
 }
 
 // Английское название города для истории заказов (orders.delivery_city хранит русский текст на момент заказа)
@@ -78,4 +102,13 @@ async function translateCity(cityName, language) {
   return (cityRate && cityRate.city_en) || cityName;
 }
 
-module.exports = { normalizeName, findCity, getDeliveryPrice, findPromo, quote, resolveDelivery, translateCity, userError };
+module.exports = {
+  normalizeName,
+  findCity,
+  getDeliveryPrice,
+  findPromo,
+  quote,
+  resolveDelivery,
+  translateCity,
+  userError,
+};

@@ -7,7 +7,9 @@ async function payExistingOrder(orderId) {
   try {
     const payment = await callApi(`/orders/${orderId}/pay`, {}, 1);
     openPaymentLink(payment.pay_url);
-  } catch (error) { showToast(error.message); }
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 export const orderActions = {

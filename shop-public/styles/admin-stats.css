@@ -1,14 +1,95 @@
 /* Админка → статистика: плитки показателей, график по дням, рейтинги */
-.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.kpi{background:var(--card);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
-.kpi span{font-size:12.5px;color:var(--muted)} .kpi b{font-size:21px;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kpi i{font-style:normal;font-size:12px;color:var(--muted)}
-.bars{display:flex;align-items:flex-end;gap:3px;height:120px;border-bottom:1px solid var(--line)}
-.bars.dense{gap:1px}
-.bar{flex:1;height:100%;display:flex;align-items:flex-end;cursor:pointer;min-width:0}
-.bar i{display:block;width:100%;background:var(--accent);border-radius:4px 4px 0 0;opacity:.85}
-.axis{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:6px}
-.hbar{margin-bottom:10px} .hbar .hl{display:flex;justify-content:space-between;gap:10px;font-size:14px}
-.hbar .hl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hbar .ht{height:6px;background:var(--bg);border-radius:3px;margin:5px 0 2px;overflow:hidden} .hbar .ht i{display:block;height:100%;background:var(--accent);border-radius:3px}
-.hbar small{color:var(--muted);font-size:12px}
+.kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.kpi {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.kpi span {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.kpi b {
+  font-size: 21px;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kpi i {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 120px;
+  border-bottom: 1px solid var(--line);
+}
+.bars.dense {
+  gap: 1px;
+}
+.bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+  min-width: 0;
+}
+.bar i {
+  display: block;
+  width: 100%;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+  opacity: 0.85;
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.hbar {
+  margin-bottom: 10px;
+}
+.hbar .hl {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+.hbar .hl span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hbar .ht {
+  height: 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  margin: 5px 0 2px;
+  overflow: hidden;
+}
+.hbar .ht i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+.hbar small {
+  color: var(--muted);
+  font-size: 12px;
+}

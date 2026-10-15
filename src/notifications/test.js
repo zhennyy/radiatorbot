@@ -4,7 +4,9 @@ const assert = require('node:assert/strict');
 const testHelpers = require('../server/test-helpers');
 
 let shop;
-before(async () => { shop = await testHelpers.start(); });
+before(async () => {
+  shop = await testHelpers.start();
+});
 
 test('заканчивающийся товар: одно сообщение владелице, повтор — только при изменении', async () => {
   const { checkLowStock } = require('./index');
@@ -12,7 +14,10 @@ test('заканчивающийся товар: одно сообщение в�
   await shop.database.product.update({ where: { id: product.id }, data: { stock: 2 } });
   shop.sent.length = 0;
   await checkLowStock(shop.bot);
-  const warnings = () => shop.sent.filter((message) => String(message.chat) === process.env.OWNER_CHAT_ID && /Заканчивается/.test(message.text));
+  const warnings = () =>
+    shop.sent.filter(
+      (message) => String(message.chat) === process.env.OWNER_CHAT_ID && /Заканчивается/.test(message.text),
+    );
   assert.equal(warnings().length, 1);
   assert.match(warnings()[0].text, new RegExp(`${product.name} — осталось 2 шт\\.`));
   await checkLowStock(shop.bot);

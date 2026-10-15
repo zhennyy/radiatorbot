@@ -24,7 +24,8 @@ export function setUnreadCount(count) {
 
 export async function loadAdmin() {
   stopChatPolling();
-  getElement('v-admin').innerHTML = `<h1>Админка</h1>${sectionsMenuHtml()}<div id="admBody"><div class="skel" style="aspect-ratio:3/1"></div></div>`;
+  getElement('v-admin').innerHTML =
+    `<h1>Админка</h1>${sectionsMenuHtml()}<div id="admBody"><div class="skel" style="aspect-ratio:3/1"></div></div>`;
   document.querySelector('.chips.adm .on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   try {
     switch (adminState.section) {
@@ -40,7 +41,8 @@ export async function loadAdmin() {
         await loadStats();
         break;
       case 'chats':
-        if (adminState.openChatId) await openChat(adminState.openChatId); else await loadChats();
+        if (adminState.openChatId) await openChat(adminState.openChatId);
+        else await loadChats();
         break;
       case 'settings':
         adminState.settings = await callApi('/admin/settings');

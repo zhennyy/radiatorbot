@@ -12,7 +12,9 @@ const { registerOwnerCommands } = require('./handlers/owner-commands');
 const CHECKOUT_SESSION_TTL_SECONDS = 30 * 60; // брошенное оформление само забывается через 30 минут
 
 // TELEGRAM_API_ROOT — посредник для Telegram (нужен, если сервер в России)
-const telegramOptions = process.env.TELEGRAM_API_ROOT ? { telegram: { apiRoot: process.env.TELEGRAM_API_ROOT.replace(/\/*$/, '/') } } : {};
+const telegramOptions = process.env.TELEGRAM_API_ROOT
+  ? { telegram: { apiRoot: process.env.TELEGRAM_API_ROOT.replace(/\/*$/, '/') } }
+  : {};
 const bot = new Telegraf(process.env.BOT_TOKEN, telegramOptions);
 
 bot.use(session());
@@ -43,7 +45,9 @@ registerOwnerCommands(bot);
 chat.setupRelay(bot);
 
 // Ошибка в одном обработчике не должна ронять бота целиком
-bot.catch((handlerError, context) => console.error('Ошибка бота:', context?.updateType, handlerError?.message || handlerError));
+bot.catch((handlerError, context) =>
+  console.error('Ошибка бота:', context?.updateType, handlerError?.message || handlerError),
+);
 
 // Запуск бота; кнопка «🛍 Магазин» у поля ввода открывает витрину
 async function launchBot() {
@@ -62,7 +66,8 @@ async function launchBot() {
 // Витрине нужны две вещи из бота: AI-подбор и показ корзины в чате
 const showcaseHelpers = {
   aiPick: (query, language, userId) => getAiRecommendation(query, language, userId),
-  showCartFor: (chatId) => showCart({ chat: { id: chatId }, reply: (text, extra) => bot.telegram.sendMessage(chatId, text, extra) }),
+  showCartFor: (chatId) =>
+    showCart({ chat: { id: chatId }, reply: (text, extra) => bot.telegram.sendMessage(chatId, text, extra) }),
 };
 
 module.exports = { bot, launchBot, showcaseHelpers };

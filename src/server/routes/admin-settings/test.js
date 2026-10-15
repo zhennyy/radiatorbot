@@ -16,13 +16,26 @@ test('настройки: доставка, города, промокоды —
   assert.equal(settings.status, 200);
   assert.deepEqual(Object.keys(settings.body).sort(), ['cities', 'delivery', 'promos']);
   assert.deepEqual(settings.body.delivery, { otherPrice: 150000, freeFrom: 0, pickup: true, pickupAddress: '' });
-  const saved = await shop.call(OWNER_ID, 'POST', '/shop-api/admin/delivery', { otherPrice: '1 200', freeFrom: 30000, pickup: true, pickupAddress: 'Отрадное, ул. Победы, 1' });
+  const saved = await shop.call(OWNER_ID, 'POST', '/shop-api/admin/delivery', {
+    otherPrice: '1 200',
+    freeFrom: 30000,
+    pickup: true,
+    pickupAddress: 'Отрадное, ул. Победы, 1',
+  });
   assert.equal(saved.status, 200, JSON.stringify(saved.body));
-  assert.deepEqual(saved.body.delivery, { otherPrice: 120000, freeFrom: 3000000, pickup: true, pickupAddress: 'Отрадное, ул. Победы, 1' });
+  assert.deepEqual(saved.body.delivery, {
+    otherPrice: 120000,
+    freeFrom: 3000000,
+    pickup: true,
+    pickupAddress: 'Отрадное, ул. Победы, 1',
+  });
   const checkoutInfo = await shop.call(BUYER_ID, 'GET', '/shop-api/checkout-info');
   assert.equal(checkoutInfo.body.otherPrice, 120000);
   assert.equal(checkoutInfo.body.pickupAddress, 'Отрадное, ул. Победы, 1');
-  assert.match((await shop.call(OWNER_ID, 'POST', '/shop-api/admin/delivery', { otherPrice: 'дорого' })).body.error, /числом/);
+  assert.match(
+    (await shop.call(OWNER_ID, 'POST', '/shop-api/admin/delivery', { otherPrice: 'дорого' })).body.error,
+    /числом/,
+  );
   assert.equal((await shop.call(BUYER_ID, 'POST', '/shop-api/admin/delivery', { otherPrice: 1 })).status, 403);
 });
 
@@ -32,7 +45,11 @@ test('города: добавить, изменить цену, удалить'
   const kazan = added.body.cities.find((rate) => rate.city === 'Казань');
   assert.equal(kazan.price, 90000);
   assert.equal((await shop.call(OWNER_ID, 'POST', '/shop-api/admin/cities', { city: 'К', price: 100 })).status, 400);
-  const updated = await shop.call(OWNER_ID, 'POST', '/shop-api/admin/cities', { id: kazan.id, city: 'Казань', price: 950 });
+  const updated = await shop.call(OWNER_ID, 'POST', '/shop-api/admin/cities', {
+    id: kazan.id,
+    city: 'Казань',
+    price: 950,
+  });
   assert.equal(updated.body.cities.find((rate) => rate.id === kazan.id).price, 95000);
   const removed = await shop.call(OWNER_ID, 'POST', `/shop-api/admin/cities/${kazan.id}/delete`, {});
   assert.ok(!removed.body.cities.some((rate) => rate.id === kazan.id));
@@ -40,12 +57,22 @@ test('города: добавить, изменить цену, удалить'
 
 test('промокоды: проверка формы, дубль, выключение', async () => {
   assert.equal((await shop.call(OWNER_ID, 'POST', '/shop-api/admin/promos', { code: 'X', percent: 10 })).status, 400);
-  assert.equal((await shop.call(OWNER_ID, 'POST', '/shop-api/admin/promos', { code: 'AUTUMN', percent: 95 })).status, 400);
-  const created = await shop.call(OWNER_ID, 'POST', '/shop-api/admin/promos', { code: 'autumn', percent: 15, max_uses: 3 });
+  assert.equal(
+    (await shop.call(OWNER_ID, 'POST', '/shop-api/admin/promos', { code: 'AUTUMN', percent: 95 })).status,
+    400,
+  );
+  const created = await shop.call(OWNER_ID, 'POST', '/shop-api/admin/promos', {
+    code: 'autumn',
+    percent: 15,
+    max_uses: 3,
+  });
   assert.equal(created.status, 200, JSON.stringify(created.body));
   const promo = created.body.promos.find((promoCode) => promoCode.code === 'AUTUMN');
   assert.equal(promo.discount_percent, 15);
-  assert.match((await shop.call(OWNER_ID, 'POST', '/shop-api/admin/promos', { code: 'AUTUMN', percent: 10 })).body.error, /уже есть/);
+  assert.match(
+    (await shop.call(OWNER_ID, 'POST', '/shop-api/admin/promos', { code: 'AUTUMN', percent: 10 })).body.error,
+    /уже есть/,
+  );
   const switchedOff = await shop.call(OWNER_ID, 'POST', `/shop-api/admin/promos/${promo.id}`, { active: false });
   assert.equal(switchedOff.body.promos.find((promoCode) => promoCode.id === promo.id).active, 0);
 });
@@ -54,7 +81,11 @@ test('статистика: выручка по оплаченным заказ�
   const actions = testHelpers.createShopActions(shop);
   const product = await shop.database.product.findFirst({ where: { name: 'Радиатор Nova Grande' } });
   await actions.setCart(BUYER_ID, [[product.id, 2]]);
-  const response = await shop.call(BUYER_ID, 'POST', '/shop-api/order', { delivery: 'city', city: 'Псков', address: 'ул. Советская, 5' });
+  const response = await shop.call(BUYER_ID, 'POST', '/shop-api/order', {
+    delivery: 'city',
+    city: 'Псков',
+    address: 'ул. Советская, 5',
+  });
   assert.equal(response.status, 200, JSON.stringify(response.body));
   await actions.payLastOrder();
   const stats = (await shop.call(OWNER_ID, 'GET', '/shop-api/admin/stats?days=30')).body;
@@ -82,6 +113,12 @@ test('чаты: сообщение покупателю после его зак
   assert.equal(stats.body.days, 7);
   assert.equal(stats.body.byDay.length, 7);
   assert.equal((await shop.call(BUYER_ID, 'GET', '/shop-api/admin/stats')).status, 403);
-  assert.equal((await shop.call(OWNER_ID, 'POST', `/shop-api/admin/chats/${NEW_BUYER_ID}`, { text: '   ' })).status, 400);
-  assert.match((await shop.call(OWNER_ID, 'POST', `/shop-api/admin/chats/${NEW_BUYER_ID}`, { text: 'Привет' })).body.error, /ещё не писал/);
+  assert.equal(
+    (await shop.call(OWNER_ID, 'POST', `/shop-api/admin/chats/${NEW_BUYER_ID}`, { text: '   ' })).status,
+    400,
+  );
+  assert.match(
+    (await shop.call(OWNER_ID, 'POST', `/shop-api/admin/chats/${NEW_BUYER_ID}`, { text: 'Привет' })).body.error,
+    /ещё не писал/,
+  );
 });

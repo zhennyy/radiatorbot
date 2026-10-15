@@ -39,7 +39,8 @@ const photoUploadValidator = createValidator((request) => ({
 
 const photoUrlValidator = createValidator((request) => {
   const photoUrl = String(request.body.url || '').trim();
-  if (!/^https:\/\/[^\s]+$/i.test(photoUrl) || photoUrl.length > MAX_PHOTO_URL_LENGTH) throw new ValidationError('Нужна ссылка, начинающаяся с https://');
+  if (!/^https:\/\/[^\s]+$/i.test(photoUrl) || photoUrl.length > MAX_PHOTO_URL_LENGTH)
+    throw new ValidationError('Нужна ссылка, начинающаяся с https://');
   return { productId: parsePositiveId(request.params.id), photoUrl };
 });
 

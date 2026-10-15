@@ -6,10 +6,24 @@ const PAID_STATUSES = new Set(ORDER_FLOW);
 const MANUAL_STATUSES = new Set([...ORDER_FLOW, 'cancelled']); // вручную в «ждёт оплату» не возвращаем
 
 const STATUS_LABELS = {
-  ru: { awaiting_payment: '⏳ Ждёт оплату', pending: '⏳ Ждёт оплату', paid: '🆕 Оплачен', assembling: '📦 Собираем',
-        shipped: '🚚 Отправлен', delivered: '✅ Доставлен', cancelled: '❌ Отменён' },
-  en: { awaiting_payment: '⏳ Awaiting payment', pending: '⏳ Awaiting payment', paid: '🆕 Paid', assembling: '📦 Packing',
-        shipped: '🚚 Shipped', delivered: '✅ Delivered', cancelled: '❌ Cancelled' },
+  ru: {
+    awaiting_payment: '⏳ Ждёт оплату',
+    pending: '⏳ Ждёт оплату',
+    paid: '🆕 Оплачен',
+    assembling: '📦 Собираем',
+    shipped: '🚚 Отправлен',
+    delivered: '✅ Доставлен',
+    cancelled: '❌ Отменён',
+  },
+  en: {
+    awaiting_payment: '⏳ Awaiting payment',
+    pending: '⏳ Awaiting payment',
+    paid: '🆕 Paid',
+    assembling: '📦 Packing',
+    shipped: '🚚 Shipped',
+    delivered: '✅ Delivered',
+    cancelled: '❌ Cancelled',
+  },
 };
 const PICKUP_READY_LABEL = { ru: '🏠 Готов к выдаче', en: '🏠 Ready for pickup' };
 

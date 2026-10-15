@@ -23,7 +23,10 @@ function createApp(bot, { showCartFor, aiPick } = {}) {
   app.use('/uploads', express.static(photos.uploadsDir)); // без авторизации — Telegram должен уметь их скачать
   app.use('/photos', express.static(photos.photosDir, { maxAge: '7d' }));
   // Покупатель открывает /shop внутри Telegram; Telegram не должен держать старую версию витрины
-  app.use('/shop', express.static(SHOP_STATIC_DIR, { setHeaders: (response) => response.set('Cache-Control', 'no-cache') }));
+  app.use(
+    '/shop',
+    express.static(SHOP_STATIC_DIR, { setHeaders: (response) => response.set('Cache-Control', 'no-cache') }),
+  );
 
   const isRequestAllowed = createRateLimiter();
   const { shopAuth, ownerAuth } = createAuthMiddlewares(isRequestAllowed);
@@ -32,7 +35,10 @@ function createApp(bot, { showCartFor, aiPick } = {}) {
 
   app.use('/shop-api', createShopRouter({ shopAuth, aiPick, showCartFor }));
   app.use('/shop-api', createCheckoutRouter({ bot, shopAuth, isRequestAllowed }));
-  app.use('/shop-api/admin', createAdminProductsRouter({ bot, ownerAuth, forgetShowcasePhoto: showcasePhoto.forgetPhoto }));
+  app.use(
+    '/shop-api/admin',
+    createAdminProductsRouter({ bot, ownerAuth, forgetShowcasePhoto: showcasePhoto.forgetPhoto }),
+  );
   app.use('/shop-api/admin', createAdminOrdersRouter({ bot, ownerAuth }));
   app.use('/shop-api/admin', createAdminSettingsRouter({ bot, ownerAuth }));
   app.use(createYookassaRouter({ bot }));
@@ -54,7 +60,8 @@ function startWebhookServer(bot, showcaseHelpers = {}) {
   const app = createApp(bot, showcaseHelpers);
   // фото: разово ставим фото из папки проекта, затем разовые правки каталога (порядок как раньше);
   // при старте и раз в 6 часов скачиваем чужие ссылки к себе
-  photos.assignProjectPhotos()
+  photos
+    .assignProjectPhotos()
     .catch((photoError) => console.error('Фото из проекта:', photoError.message))
     .then(applyOneTimeFixes)
     .catch((fixError) => console.error('Разовые правки:', fixError.message));
@@ -62,7 +69,9 @@ function startWebhookServer(bot, showcaseHelpers = {}) {
   setInterval(photos.localizeAllPhotos, PHOTO_CHECK_INTERVAL_MS);
 
   const port = process.env.WEBHOOK_PORT || 3001;
-  return app.listen(port, process.env.HOST || '127.0.0.1', () => console.log(`Вебхук ЮKassa и магазин слушают порт ${port}`));
+  return app.listen(port, process.env.HOST || '127.0.0.1', () =>
+    console.log(`Вебхук ЮKassa и магазин слушают порт ${port}`),
+  );
 }
 
 module.exports = { startWebhookServer, createApp, assertPublicUrl: photos.assertPublicUrl };

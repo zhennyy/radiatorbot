@@ -18,12 +18,18 @@ export function initTelegram() {
 
 /** Лёгкая вибрация: 'light' | 'medium' | 'heavy' */
 export function vibrate(strength) {
-  try { telegram?.HapticFeedback?.impactOccurred(strength || 'light'); } catch { /* старые клиенты Telegram */ }
+  try {
+    telegram?.HapticFeedback?.impactOccurred(strength || 'light');
+  } catch {
+    /* старые клиенты Telegram */
+  }
 }
 
 /** Вопрос «да/нет»: в Telegram — родное окно, в браузере — confirm() */
 export function confirmAction(question) {
-  return new Promise((resolve) => (telegram?.showConfirm ? telegram.showConfirm(question, resolve) : resolve(window.confirm(question))));
+  return new Promise((resolve) =>
+    telegram?.showConfirm ? telegram.showConfirm(question, resolve) : resolve(window.confirm(question)),
+  );
 }
 
 export function openPaymentLink(url) {

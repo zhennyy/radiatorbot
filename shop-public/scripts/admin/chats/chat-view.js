@@ -95,10 +95,20 @@ export async function openChat(chatId) {
   renderChat(chat);
   stopChatPolling();
   pollTimer = setInterval(async () => {
-    if (state.activeTab !== 'admin' || adminState.section !== 'chats' || adminState.openChatId !== chatId || document.hidden) return;
+    if (
+      state.activeTab !== 'admin' ||
+      adminState.section !== 'chats' ||
+      adminState.openChatId !== chatId ||
+      document.hidden
+    )
+      return;
     const replyField = getElement('reply');
     if (document.activeElement === replyField && replyField.value) return; // не мешаем печатать
-    try { renderChat(await callApi('/admin/chats/' + chatId, null, 1), true); } catch { /* попробуем при следующем опросе */ }
+    try {
+      renderChat(await callApi('/admin/chats/' + chatId, null, 1), true);
+    } catch {
+      /* попробуем при следующем опросе */
+    }
   }, POLL_INTERVAL_MS);
 }
 

@@ -21,10 +21,16 @@ export const ADMIN_SECTIONS = [
 ];
 
 const STATUS_LABELS = {
-  awaiting_payment: '⏳ Ждёт оплату', pending: '⏳ Ждёт оплату', paid: '🆕 Новый', assembling: '📦 Собираем',
-  shipped: '🚚 Отправлен', delivered: '✅ Доставлен', cancelled: '❌ Отменён',
+  awaiting_payment: '⏳ Ждёт оплату',
+  pending: '⏳ Ждёт оплату',
+  paid: '🆕 Новый',
+  assembling: '📦 Собираем',
+  shipped: '🚚 Отправлен',
+  delivered: '✅ Доставлен',
+  cancelled: '❌ Отменён',
 };
 
 /** Подпись статуса для владелицы; «Отправлен» у самовывоза — «Готов к выдаче» */
-export const orderStatusLabel = (order) => (order.status === 'shipped' && order.pickup ? '🏠 Готов к выдаче' : (STATUS_LABELS[order.status] || order.status));
+export const orderStatusLabel = (order) =>
+  order.status === 'shipped' && order.pickup ? '🏠 Готов к выдаче' : STATUS_LABELS[order.status] || order.status;
 export const statusLabel = (status) => STATUS_LABELS[status] || status;

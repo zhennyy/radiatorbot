@@ -15,14 +15,19 @@ const MAIN_BUTTON_COLORS = { color: '#e8590c', text_color: '#ffffff' };
 
 export function switchTab(tabName) {
   state.activeTab = tabName;
-  document.querySelectorAll('section.view').forEach((section) => section.classList.toggle('on', section.id === 'v-' + tabName));
+  document
+    .querySelectorAll('section.view')
+    .forEach((section) => section.classList.toggle('on', section.id === 'v-' + tabName));
   // оформление — продолжение корзины: подсвечиваем вкладку «Корзина»
   const highlightedTab = tabName === 'checkout' ? 'cart' : tabName;
-  document.querySelectorAll('#tabs button').forEach((button) => button.classList.toggle('on', button.dataset.tab === highlightedTab));
+  document
+    .querySelectorAll('#tabs button')
+    .forEach((button) => button.classList.toggle('on', button.dataset.tab === highlightedTab));
   if (tabName === 'orders') loadOrders();
   if (tabName === 'admin') loadAdmin();
   if (tabName === 'cart') renderCart();
-  if (tabName === 'catalog') telegram?.BackButton?.hide(); else telegram?.BackButton?.show();
+  if (tabName === 'catalog') telegram?.BackButton?.hide();
+  else telegram?.BackButton?.show();
   updateMainButton();
   window.scrollTo(0, 0);
 }
@@ -52,7 +57,8 @@ function onMainButtonClick() {
 function onBackButtonClick() {
   if (isSheetOpen()) closeSheet();
   else if (state.activeTab === 'checkout') switchTab('cart');
-  else if (state.activeTab === 'admin' && goBackInAdmin()) return; // из открытого чата — к списку чатов
+  else if (state.activeTab === 'admin' && goBackInAdmin())
+    return; // из открытого чата — к списку чатов
   else switchTab('catalog');
 }
 

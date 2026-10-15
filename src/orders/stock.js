@@ -10,9 +10,17 @@ async function takeStockForOrder(order) {
     if (neededQuantity <= 0) continue;
     const product = await database.product.findUnique({ where: { id: orderItem.product_id }, select: { stock: true } });
     const takenQuantity = Math.max(0, Math.min(product?.stock ?? 0, neededQuantity));
-    if (takenQuantity) await database.product.update({ where: { id: orderItem.product_id }, data: { stock: { decrement: takenQuantity } } });
-    await database.orderItem.update({ where: { id: orderItem.id }, data: { stock_taken: { increment: takenQuantity } } });
-    if (takenQuantity < neededQuantity) shortages.push(`${orderItem.name || 'товар'} — не хватило ${neededQuantity - takenQuantity} шт.`);
+    if (takenQuantity)
+      await database.product.update({
+        where: { id: orderItem.product_id },
+        data: { stock: { decrement: takenQuantity } },
+      });
+    await database.orderItem.update({
+      where: { id: orderItem.id },
+      data: { stock_taken: { increment: takenQuantity } },
+    });
+    if (takenQuantity < neededQuantity)
+      shortages.push(`${orderItem.name || 'товар'} — не хватило ${neededQuantity - takenQuantity} шт.`);
   }
   return shortages;
 }
@@ -21,7 +29,10 @@ async function takeStockForOrder(order) {
 async function returnStockForOrder(order) {
   for (const orderItem of order.items) {
     if (!orderItem.stock_taken) continue;
-    await database.product.updateMany({ where: { id: orderItem.product_id }, data: { stock: { increment: orderItem.stock_taken } } });
+    await database.product.updateMany({
+      where: { id: orderItem.product_id },
+      data: { stock: { increment: orderItem.stock_taken } },
+    });
     await database.orderItem.update({ where: { id: orderItem.id }, data: { stock_taken: 0 } });
   }
 }

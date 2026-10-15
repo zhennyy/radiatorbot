@@ -55,17 +55,29 @@ async function runBuyerScreens(runner, shop) {
   await page.waitForSelector('#v-orders.on .order');
   await runner.settle(page);
   const links = await page.evaluate(() => window.__telegramLog.links);
-  check('после оформления открыта ссылка на оплату', links.length === 1 && links[0].startsWith('https://pay.test/'), JSON.stringify(links));
+  check(
+    'после оформления открыта ссылка на оплату',
+    links.length === 1 && links[0].startsWith('https://pay.test/'),
+    JSON.stringify(links),
+  );
   await normalizeOrders(shop);
   await tabButton(page, 'Каталог').click();
   await tabButton(page, 'Заказы').click();
   await page.waitForSelector('#v-orders .order');
   await snap(page, 'b16-orders-after-checkout');
   const ordersText = await page.locator('#v-orders').innerText();
-  check('новый заказ виден в «Мои заказы»', /RP-105/.test(ordersText) && /Ждёт оплат/i.test(ordersText), ordersText.slice(0, 200));
+  check(
+    'новый заказ виден в «Мои заказы»',
+    /RP-105/.test(ordersText) && /Ждёт оплат/i.test(ordersText),
+    ordersText.slice(0, 200),
+  );
   check('корзина пуста после заказа', (await page.locator('#cartCount').innerText()) === '');
   const newOrder = await shop.database.order.findFirst({ where: { chat_id: BUYER_ID }, orderBy: { id: 'desc' } });
-  check('заказ создан со скидкой по промокоду и самовывозом', newOrder.promo_code === 'HEAT10' && !newOrder.delivery_city, JSON.stringify({ promo: newOrder.promo_code, city: newOrder.delivery_city }));
+  check(
+    'заказ создан со скидкой по промокоду и самовывозом',
+    newOrder.promo_code === 'HEAT10' && !newOrder.delivery_city,
+    JSON.stringify({ promo: newOrder.promo_code, city: newOrder.delivery_city }),
+  );
 
   await tabButton(page, 'Корзина').click();
   await snap(page, 'b17-cart-empty');

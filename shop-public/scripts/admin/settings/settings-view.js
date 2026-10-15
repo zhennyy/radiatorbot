@@ -9,12 +9,16 @@ const toRubles = (kopecks) => (kopecks ? Math.round(kopecks / 100) : 0);
 
 function cityDeliveryHtml(settings) {
   const delivery = settings.delivery;
-  const cityRows = settings.cities.map((city) => `
+  const cityRows = settings.cities
+    .map(
+      (city) => `
         <div class="crow ${city.active ? '' : 'off'}" data-city-id="${city.id}">
           <input class="cn" value="${escapeHtml(city.city)}"><input class="cp" type="number" inputmode="numeric" value="${toRubles(city.price)}"><span class="rub">₽</span>
           <label class="sw"><input type="checkbox" class="ca" ${city.active ? 'checked' : ''}><i></i></label>
           <button class="mini" data-action="delete-city" data-city-id="${city.id}" aria-label="Удалить">🗑</button>
-        </div>`).join('');
+        </div>`,
+    )
+    .join('');
   return `<div class="box form"><h3>🚚 Доставка по городам</h3>
       ${cityRows}
       <div class="crow new"><input id="ncity" placeholder="Новый город"><input id="nprice" type="number" inputmode="numeric" placeholder="Цена"><span class="rub">₽</span><button class="btn small" data-action="add-city">＋</button></div>
@@ -29,13 +33,19 @@ function cityDeliveryHtml(settings) {
 }
 
 function promosHtml(settings) {
-  const promoRows = settings.promos.length ? settings.promos.map((promo) => `
+  const promoRows = settings.promos.length
+    ? settings.promos
+        .map(
+          (promo) => `
         <div class="prow ${promo.active ? '' : 'off'}">
           <div class="mid"><b>${escapeHtml(promo.code)}</b> <span class="pill">−${promo.discount_percent}%</span>
             <div class="s">использован ${promo.used_count}${promo.max_uses ? ' из ' + promo.max_uses : ''} раз</div></div>
           <label class="sw"><input type="checkbox" data-action="toggle-promo" data-promo-id="${promo.id}" ${promo.active ? 'checked' : ''}><i></i></label>
           <button class="mini" data-action="delete-promo" data-promo-id="${promo.id}" aria-label="Удалить">🗑</button>
-        </div>`).join('') : '<div class="note" style="text-align:left">Промокодов пока нет</div>';
+        </div>`,
+        )
+        .join('')
+    : '<div class="note" style="text-align:left">Промокодов пока нет</div>';
   return `<div class="box form"><h3>🎟 Промокоды</h3>
       ${promoRows}
       <div class="two3"><input id="pcode" placeholder="КОД" autocapitalize="characters"><input id="ppct" type="number" inputmode="numeric" placeholder="%"><input id="pmax" type="number" inputmode="numeric" placeholder="лимит"></div>
@@ -63,10 +73,21 @@ function listenToCityRows() {
     const saveCity = async () => {
       const isActive = row.querySelector('.ca').checked;
       try {
-        adminState.settings = await callApi('/admin/cities', { id: Number(row.dataset.cityId), city: row.querySelector('.cn').value, price: row.querySelector('.cp').value, active: isActive }, 1);
+        adminState.settings = await callApi(
+          '/admin/cities',
+          {
+            id: Number(row.dataset.cityId),
+            city: row.querySelector('.cn').value,
+            price: row.querySelector('.cp').value,
+            active: isActive,
+          },
+          1,
+        );
         row.classList.toggle('off', !isActive);
         showToast('Сохранено ✓');
-      } catch (error) { showToast(error.message); }
+      } catch (error) {
+        showToast(error.message);
+      }
     };
     row.querySelectorAll('input').forEach((input) => input.addEventListener('change', saveCity));
   });

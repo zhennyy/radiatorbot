@@ -1,64 +1,79 @@
 <!doctype html>
 <html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>RadiatorPro</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="styles/base.css">
-<link rel="stylesheet" href="styles/layout.css">
-<link rel="stylesheet" href="styles/catalog.css">
-<link rel="stylesheet" href="styles/product-sheet.css">
-<link rel="stylesheet" href="styles/cart.css">
-<link rel="stylesheet" href="styles/checkout.css">
-<link rel="stylesheet" href="styles/orders.css">
-<link rel="stylesheet" href="styles/ai.css">
-<link rel="stylesheet" href="styles/admin.css">
-<link rel="stylesheet" href="styles/admin-stats.css">
-<link rel="stylesheet" href="styles/admin-chats.css">
-<script type="module" src="scripts/main.js"></script>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <div class="logo">Radiator<span>Pro</span> 🔥</div>
-    <div class="lang" id="lang"><button data-action="switch-language" data-lang="ru">RU</button><button data-action="switch-language" data-lang="en">EN</button></div>
-  </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <title>RadiatorPro</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/layout.css" />
+    <link rel="stylesheet" href="styles/catalog.css" />
+    <link rel="stylesheet" href="styles/product-sheet.css" />
+    <link rel="stylesheet" href="styles/cart.css" />
+    <link rel="stylesheet" href="styles/checkout.css" />
+    <link rel="stylesheet" href="styles/orders.css" />
+    <link rel="stylesheet" href="styles/ai.css" />
+    <link rel="stylesheet" href="styles/admin.css" />
+    <link rel="stylesheet" href="styles/admin-stats.css" />
+    <link rel="stylesheet" href="styles/admin-chats.css" />
+    <script type="module" src="scripts/main.js"></script>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="logo">Radiator<span>Pro</span> 🔥</div>
+        <div class="lang" id="lang">
+          <button data-action="switch-language" data-lang="ru">RU</button
+          ><button data-action="switch-language" data-lang="en">EN</button>
+        </div>
+      </header>
 
-  <section class="view on" id="v-catalog">
-    <label class="search">🔍<input id="q" type="search" autocomplete="off"></label>
-    <div class="chips" id="chips"></div>
-    <main class="grid" id="grid"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></main>
-  </section>
+      <section class="view on" id="v-catalog">
+        <label class="search">🔍<input id="q" type="search" autocomplete="off" /></label>
+        <div class="chips" id="chips"></div>
+        <main class="grid" id="grid">
+          <div class="skel"></div>
+          <div class="skel"></div>
+          <div class="skel"></div>
+          <div class="skel"></div>
+        </main>
+      </section>
 
-  <section class="view" id="v-cart"></section>
-  <section class="view" id="v-orders"></section>
-  <section class="view co" id="v-checkout"></section>
+      <section class="view" id="v-cart"></section>
+      <section class="view" id="v-orders"></section>
+      <section class="view co" id="v-checkout"></section>
 
-  <section class="view" id="v-admin"></section>
+      <section class="view" id="v-admin"></section>
 
-  <section class="view ai" id="v-ai">
-    <h1 id="aiTitle"></h1>
-    <textarea id="aiQ"></textarea>
-    <div class="hints" id="aiHints"></div>
-    <button class="btn" id="aiGo"></button>
-    <div class="advice" id="aiAdvice"></div>
-    <div class="grid" id="aiGrid"></div>
-  </section>
-</div>
+      <section class="view ai" id="v-ai">
+        <h1 id="aiTitle"></h1>
+        <textarea id="aiQ"></textarea>
+        <div class="hints" id="aiHints"></div>
+        <button class="btn" id="aiGo"></button>
+        <div class="advice" id="aiAdvice"></div>
+        <div class="grid" id="aiGrid"></div>
+      </section>
+    </div>
 
-<nav class="tabs"><div class="in" id="tabs">
-  <button data-action="switch-tab" data-tab="catalog" class="on"><i>🏠</i><span data-i18n="tabCatalog"></span></button>
-  <button data-action="switch-tab" data-tab="cart"><i>🛒</i><span data-i18n="tabCart"></span><b id="cartCount"></b></button>
-  <button data-action="switch-tab" data-tab="orders"><i>📦</i><span data-i18n="tabOrders"></span></button>
-  <button data-action="switch-tab" data-tab="ai"><i>✨</i><span data-i18n="tabAi"></span></button>
-  <button data-action="switch-tab" data-tab="admin" id="adminTab" hidden><i>⚙️</i><span data-i18n="tabAdmin"></span><b id="admBadge"></b></button>
-</div></nav>
+    <nav class="tabs">
+      <div class="in" id="tabs">
+        <button data-action="switch-tab" data-tab="catalog" class="on">
+          <i>🏠</i><span data-i18n="tabCatalog"></span>
+        </button>
+        <button data-action="switch-tab" data-tab="cart">
+          <i>🛒</i><span data-i18n="tabCart"></span><b id="cartCount"></b>
+        </button>
+        <button data-action="switch-tab" data-tab="orders"><i>📦</i><span data-i18n="tabOrders"></span></button>
+        <button data-action="switch-tab" data-tab="ai"><i>✨</i><span data-i18n="tabAi"></span></button>
+        <button data-action="switch-tab" data-tab="admin" id="adminTab" hidden>
+          <i>⚙️</i><span data-i18n="tabAdmin"></span><b id="admBadge"></b>
+        </button>
+      </div>
+    </nav>
 
-<div class="veil" id="veil"></div>
-<section class="sheet" id="sheet"></section>
-<div class="toast" id="toast"></div>
-<input type="file" id="photoFile" accept="image/*" hidden>
-
-</body>
+    <div class="veil" id="veil"></div>
+    <section class="sheet" id="sheet"></section>
+    <div class="toast" id="toast"></div>
+    <input type="file" id="photoFile" accept="image/*" hidden />
+  </body>
 </html>

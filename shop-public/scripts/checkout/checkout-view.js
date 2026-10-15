@@ -5,18 +5,29 @@ import { getElement, escapeHtml } from '../utils/dom.js';
 import { formatRubles } from '../utils/format.js';
 import { cartTotals } from '../cart/cart-model.js';
 import { updateMainButton } from '../navigation.js';
-import { checkoutForm, checkout, OTHER_CITY, deliveryCost, isDeliveryFree, goodsTotal, discountAmount } from './checkout-state.js';
+import {
+  checkoutForm,
+  checkout,
+  OTHER_CITY,
+  deliveryCost,
+  isDeliveryFree,
+  goodsTotal,
+  discountAmount,
+} from './checkout-state.js';
 
 function deliverySwitchHtml() {
   if (!checkout.info.pickup) return '';
-  const button = (method, label) => `<button data-action="choose-delivery" data-delivery="${method}" class="${checkoutForm.delivery === method ? 'on' : ''}">${label}</button>`;
+  const button = (method, label) =>
+    `<button data-action="choose-delivery" data-delivery="${method}" class="${checkoutForm.delivery === method ? 'on' : ''}">${label}</button>`;
   return `<div class="seg">${button('city', '🚚 Доставка')}${button('pickup', '🏠 Самовывоз')}</div>`;
 }
 
 function freeDeliveryNoteHtml() {
   const info = checkout.info;
   if (checkoutForm.delivery !== 'city' || !(info.freeFrom > 0)) return '';
-  const text = isDeliveryFree() ? '🎉 Доставка бесплатно!' : `Бесплатная доставка от ${formatRubles(info.freeFrom)} — осталось ${formatRubles(info.freeFrom - goodsTotal())}`;
+  const text = isDeliveryFree()
+    ? '🎉 Доставка бесплатно!'
+    : `Бесплатная доставка от ${formatRubles(info.freeFrom)} — осталось ${formatRubles(info.freeFrom - goodsTotal())}`;
   return `<div class="note" style="text-align:left;margin:0 0 6px">${text}</div>`;
 }
 
@@ -27,7 +38,12 @@ function deliveryFieldsHtml() {
     return `<div class="note" style="text-align:left;margin-top:10px">${info.pickupAddress ? '📍 ' + escapeHtml(info.pickupAddress) + '<br>' : ''}Напишем в чат, когда заказ будет готов к выдаче.</div>`;
   }
   const cityName = (city) => (isEnglish() && city.city_en) || city.city;
-  const cityOptions = info.cities.map((city) => `<option value="${escapeHtml(city.city)}" ${checkoutForm.city === city.city ? 'selected' : ''}>${escapeHtml(cityName(city))} — ${formatRubles(city.price)}</option>`).join('');
+  const cityOptions = info.cities
+    .map(
+      (city) =>
+        `<option value="${escapeHtml(city.city)}" ${checkoutForm.city === city.city ? 'selected' : ''}>${escapeHtml(cityName(city))} — ${formatRubles(city.price)}</option>`,
+    )
+    .join('');
   return `
         <div class="fld"><select id="coCity">${cityOptions}
           <option value="${OTHER_CITY}" ${checkoutForm.city === OTHER_CITY ? 'selected' : ''}>Другой город — ${formatRubles(info.otherPrice)}</option></select></div>
@@ -37,7 +53,8 @@ function deliveryFieldsHtml() {
 
 function summaryHtml(total) {
   const discount = discountAmount();
-  const deliveryText = checkoutForm.delivery === 'pickup' || isDeliveryFree() ? 'бесплатно' : formatRubles(deliveryCost());
+  const deliveryText =
+    checkoutForm.delivery === 'pickup' || isDeliveryFree() ? 'бесплатно' : formatRubles(deliveryCost());
   return `<div class="box">
       <div class="sumrow"><span>Товары</span><span>${formatRubles(cartTotals().sum)}</span></div>
       ${discount ? `<div class="sumrow"><span>Скидка ${checkoutForm.promoPercent}%</span><span>−${formatRubles(discount)}</span></div>` : ''}
@@ -72,7 +89,8 @@ function bindField(id, formKey, rerender = false) {
   if (!field) return;
   field.addEventListener(field.tagName === 'SELECT' ? 'change' : 'input', (event) => {
     checkoutForm[formKey] = event.target.value;
-    if (rerender) renderCheckout(); else updateMainButton();
+    if (rerender) renderCheckout();
+    else updateMainButton();
   });
 }
 

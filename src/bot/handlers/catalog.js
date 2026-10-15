@@ -3,7 +3,16 @@ const { Markup } = require('telegraf');
 const { database } = require('../../database');
 const { translate } = require('../../i18n');
 const cart = require('../../cart');
-const { SHOP_URL, formatPrice, escapeHtml, languageOf, buildMainMenu, bothLanguages, redirectToShopIfAvailable, showShopHint } = require('../keyboards');
+const {
+  SHOP_URL,
+  formatPrice,
+  escapeHtml,
+  languageOf,
+  buildMainMenu,
+  bothLanguages,
+  redirectToShopIfAvailable,
+  showShopHint,
+} = require('../keyboards');
 
 const SEARCH_RESULTS_LIMIT = 20;
 const ALL_CATEGORIES = -1;
@@ -18,7 +27,10 @@ async function renderProductCard(context, product, language) {
     `🏷 ${escapeHtml(category)}\n` +
     `${translate(language, 'priceLabel')} <b>${formatPrice(product.price)}</b>\n` +
     (product.stock > 0 ? translate(language, 'inStock', product.stock) : translate(language, 'outOfStock'));
-  const extra = { parse_mode: 'HTML', ...Markup.inlineKeyboard([Markup.button.callback(translate(language, 'addToCart'), `add_${product.id}`)]) };
+  const extra = {
+    parse_mode: 'HTML',
+    ...Markup.inlineKeyboard([Markup.button.callback(translate(language, 'addToCart'), `add_${product.id}`)]),
+  };
   if (product.photo_url) {
     await context.replyWithPhoto(product.photo_url, { caption, ...extra }).catch(() => context.reply(caption, extra));
   } else {
@@ -29,7 +41,10 @@ async function renderProductCard(context, product, language) {
 // Категории каталога по алфавиту (их номера используются в кнопках)
 function getCatalogCategories() {
   return database.product.findMany({
-    where: { category: { not: null } }, distinct: ['category', 'category_en'], select: { category: true, category_en: true }, orderBy: { category: 'asc' },
+    where: { category: { not: null } },
+    distinct: ['category', 'category_en'],
+    select: { category: true, category_en: true },
+    orderBy: { category: 'asc' },
   });
 }
 
@@ -67,7 +82,9 @@ async function buildCarouselView(chatId, language, categoryIndex, productIndex) 
   const keyboardRows = [];
   const quantityInCart = await cart.getQuantityInCart(chatId, product.id);
   if (product.stock > 0) {
-    const addLabel = quantityInCart ? translate(language, 'inCartQty', quantityInCart) : `${translate(language, 'addToCart')} · ${formatPrice(product.price)}`;
+    const addLabel = quantityInCart
+      ? translate(language, 'inCartQty', quantityInCart)
+      : `${translate(language, 'addToCart')} · ${formatPrice(product.price)}`;
     keyboardRows.push([callbackButton(addLabel, `ca:${currentCategoryIndex}:${currentIndex}:${product.id}`)]);
   } else {
     keyboardRows.push([callbackButton(translate(language, 'outOfStock'), 'cnoop')]);
@@ -80,11 +97,20 @@ async function buildCarouselView(chatId, language, categoryIndex, productIndex) 
     ]);
   }
   if (categories.length > 1) {
-    const categoryChips = [{ label: translate(language, 'allCategories'), index: ALL_CATEGORIES }]
-      .concat(categories.map((categoryRow, index) => ({ label: localized(categoryRow, 'category', language), index })));
+    const categoryChips = [{ label: translate(language, 'allCategories'), index: ALL_CATEGORIES }].concat(
+      categories.map((categoryRow, index) => ({ label: localized(categoryRow, 'category', language), index })),
+    );
     for (let chipIndex = 0; chipIndex < categoryChips.length; chipIndex += 2) {
-      keyboardRows.push(categoryChips.slice(chipIndex, chipIndex + 2)
-        .map((chip) => callbackButton(chip.index === currentCategoryIndex ? `• ${chip.label} •` : chip.label, `cv:${chip.index}:0`)));
+      keyboardRows.push(
+        categoryChips
+          .slice(chipIndex, chipIndex + 2)
+          .map((chip) =>
+            callbackButton(
+              chip.index === currentCategoryIndex ? `• ${chip.label} •` : chip.label,
+              `cv:${chip.index}:0`,
+            ),
+          ),
+      );
     }
   }
   const unitsInCart = await cart.countCartUnits(chatId);
@@ -98,7 +124,9 @@ async function sendCarousel(context, categoryIndex = ALL_CATEGORIES, productInde
   if (!carouselView) return context.reply(translate(language, 'noProducts'), buildMainMenu(language));
   const extra = { parse_mode: 'HTML', reply_markup: carouselView.markup };
   if (carouselView.product.photo_url) {
-    return context.replyWithPhoto(carouselView.product.photo_url, { caption: carouselView.caption, ...extra }).catch(() => context.reply(carouselView.caption, extra));
+    return context
+      .replyWithPhoto(carouselView.product.photo_url, { caption: carouselView.caption, ...extra })
+      .catch(() => context.reply(carouselView.caption, extra));
   }
   return context.reply(carouselView.caption, extra);
 }
@@ -131,7 +159,9 @@ async function updateCarousel(context, categoryIndex, productIndex) {
 const answerQuietly = (context) => context.answerCbQuery().catch(() => {});
 
 function registerCatalogHandlers(bot, { showCart }) {
-  bot.hears(bothLanguages('btnCatalog'), async (context) => (SHOP_URL ? showShopHint(context) : sendCarousel(context, ALL_CATEGORIES, 0)));
+  bot.hears(bothLanguages('btnCatalog'), async (context) =>
+    SHOP_URL ? showShopHint(context) : sendCarousel(context, ALL_CATEGORIES, 0),
+  );
   bot.command('catalog', (context) => sendCarousel(context, ALL_CATEGORIES, 0));
 
   bot.action(/^cv:(-?\d+):(-?\d+)$/, async (context) => {
@@ -147,7 +177,8 @@ function registerCatalogHandlers(bot, { showCart }) {
     const productId = parseInt(context.match[3], 10);
     const product = await database.product.findUnique({ where: { id: productId }, select: { stock: true } });
     const quantityInCart = await cart.getQuantityInCart(context.chat.id, productId);
-    if (!product || product.stock <= quantityInCart) return context.answerCbQuery(translate(language, 'noMoreStock')).catch(() => {});
+    if (!product || product.stock <= quantityInCart)
+      return context.answerCbQuery(translate(language, 'noMoreStock')).catch(() => {});
     await cart.setCartQuantity(context.chat.id, productId, quantityInCart + 1);
     await context.answerCbQuery(translate(language, 'addedToCart')).catch(() => {});
     const carouselView = await buildCarouselView(context.chat.id, language, categoryIndex, productIndex);
@@ -180,7 +211,9 @@ function registerCatalogHandlers(bot, { showCart }) {
     const language = await languageOf(context);
     const categories = await getCatalogCategories();
     if (!categories.length) return context.reply(translate(language, 'noCategories'), buildMainMenu(language));
-    const categoryButtons = categories.map((categoryRow, index) => [Markup.button.callback(localized(categoryRow, 'category', language), `cat_${index}`)]);
+    const categoryButtons = categories.map((categoryRow, index) => [
+      Markup.button.callback(localized(categoryRow, 'category', language), `cat_${index}`),
+    ]);
     await context.reply(translate(language, 'categoriesPrompt'), Markup.inlineKeyboard(categoryButtons));
   });
   // номера категорий совпадают с getCatalogCategories() — тот же запрос и порядок
@@ -209,7 +242,8 @@ async function handleSearchInput(context) {
     orderBy: { name: 'asc' },
     take: SEARCH_RESULTS_LIMIT,
   });
-  if (!foundProducts.length) return context.reply(translate(language, 'searchNoResults', searchTerm), buildMainMenu(language));
+  if (!foundProducts.length)
+    return context.reply(translate(language, 'searchNoResults', searchTerm), buildMainMenu(language));
   for (const product of foundProducts) await renderProductCard(context, product, language);
 }
 

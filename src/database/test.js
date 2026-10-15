@@ -39,16 +39,28 @@ CREATE INDEX messages_chat ON messages (chat_id, id);
 `;
 
 let shop;
-before(async () => { shop = await testHelpers.start(); });
+before(async () => {
+  shop = await testHelpers.start();
+});
 
-const columnsOf = (connection, tableName) => connection.prepare(`PRAGMA table_info(${tableName})`).all().map((column) => column.name);
+const columnsOf = (connection, tableName) =>
+  connection
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all()
+    .map((column) => column.name);
 
 test('старая база: миграции дают позициям заказа id = прежний rowid, данные на месте, второй запуск ничего не меняет', () => {
   const oldDatabasePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'radiatorbot-old-')), 'shop.db');
   const oldConnection = new Database(oldDatabasePath);
   oldConnection.exec(OLD_SCHEMA_SQL);
-  oldConnection.prepare("INSERT INTO orders (chat_id, status, total, order_code, paid_at) VALUES (111, 'paid', 3000, 'AB12', '2026-10-01 10:00:00')").run();
-  const insertItem = oldConnection.prepare('INSERT INTO order_items (order_id, product_id, quantity, price, stock_taken) VALUES (?, ?, ?, ?, ?)');
+  oldConnection
+    .prepare(
+      "INSERT INTO orders (chat_id, status, total, order_code, paid_at) VALUES (111, 'paid', 3000, 'AB12', '2026-10-01 10:00:00')",
+    )
+    .run();
+  const insertItem = oldConnection.prepare(
+    'INSERT INTO order_items (order_id, product_id, quantity, price, stock_taken) VALUES (?, ?, ?, ?, ?)',
+  );
   insertItem.run(1, 1, 1, 1000, 1);
   insertItem.run(1, 5, 2, 1000, 2);
   oldConnection.prepare('DELETE FROM order_items WHERE product_id = 1').run(); // «дыра» в rowid — id должны сохраниться как есть
@@ -60,30 +72,87 @@ test('старая база: миграции дают позициям зака
   runMigrations(oldDatabasePath);
 
   const migrated = new Database(oldDatabasePath);
-  assert.deepEqual(migrated.prepare('SELECT name FROM _app_migrations ORDER BY name').all().map((row) => row.name), ['001_baseline.sql', '002_order_items_id.sql']);
+  assert.deepEqual(
+    migrated
+      .prepare('SELECT name FROM _app_migrations ORDER BY name')
+      .all()
+      .map((row) => row.name),
+    ['001_baseline.sql', '002_order_items_id.sql'],
+  );
   assert.deepEqual(migrated.prepare('SELECT id AS rowid, product_id FROM order_items ORDER BY id').all(), rowidsBefore);
-  assert.deepEqual(columnsOf(migrated, 'order_items'), ['id', 'order_id', 'product_id', 'quantity', 'price', 'stock_taken']);
+  assert.deepEqual(columnsOf(migrated, 'order_items'), [
+    'id',
+    'order_id',
+    'product_id',
+    'quantity',
+    'price',
+    'stock_taken',
+  ]);
   assert.equal(migrated.prepare('SELECT order_code FROM orders WHERE id = 1').get().order_code, 'AB12');
   migrated.close();
 });
 
 test('схема Prisma совпадает с базой: ни одной колонки кофейни, ни одной лишней таблицы', () => {
   const connection = new Database(process.env.DB_PATH, { readonly: true });
-  const tableNames = connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((row) => row.name);
-  assert.deepEqual(tableNames, ['_app_migrations', 'cart_items', 'delivery_rates', 'messages', 'order_items', 'orders', 'products', 'promo_codes', 'settings', 'user_settings']);
-  assert.deepEqual(columnsOf(connection, 'products'), ['id', 'name', 'description', 'price', 'photo_url', 'stock', 'category', 'name_en', 'description_en', 'category_en']);
+  const tableNames = connection
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+    .all()
+    .map((row) => row.name);
+  assert.deepEqual(tableNames, [
+    '_app_migrations',
+    'cart_items',
+    'delivery_rates',
+    'messages',
+    'order_items',
+    'orders',
+    'products',
+    'promo_codes',
+    'settings',
+    'user_settings',
+  ]);
+  assert.deepEqual(columnsOf(connection, 'products'), [
+    'id',
+    'name',
+    'description',
+    'price',
+    'photo_url',
+    'stock',
+    'category',
+    'name_en',
+    'description_en',
+    'category_en',
+  ]);
   assert.deepEqual(columnsOf(connection, 'user_settings'), ['chat_id', 'lang', 'name']);
-  for (const coffeeColumn of ['delivery_method', 'contact', 'carrier', 'addr_raw']) assert.ok(!columnsOf(connection, 'orders').includes(coffeeColumn), coffeeColumn);
+  for (const coffeeColumn of ['delivery_method', 'contact', 'carrier', 'addr_raw'])
+    assert.ok(!columnsOf(connection, 'orders').includes(coffeeColumn), coffeeColumn);
   connection.close();
   const schema = fs.readFileSync(path.join(__dirname, '..', '..', 'prisma', 'schema.prisma'), 'utf8');
-  for (const coffeeField of ['unit', 'step', 'min_qty', 'group_key', 'option_label', 'is_addon', 'addon_for', 'contact', 'delivery_method', 'Subscription', 'BundleItem', 'StockLogEntry']) {
+  for (const coffeeField of [
+    'unit',
+    'step',
+    'min_qty',
+    'group_key',
+    'option_label',
+    'is_addon',
+    'addon_for',
+    'contact',
+    'delivery_method',
+    'Subscription',
+    'BundleItem',
+    'StockLogEntry',
+  ]) {
     assert.doesNotMatch(schema, new RegExp(`\\b${coffeeField}\\b`), coffeeField);
   }
 });
 
 test('пустая база: стартовые радиаторы и тарифы ровно один раз', async () => {
   const { seedDatabase } = require('./seed');
-  assert.equal(await shop.database.product.count({ where: { category: { in: ['Дизайнерские', 'Стальные', 'Полотенцесушители', 'Секционные'] } } }), 5);
+  assert.equal(
+    await shop.database.product.count({
+      where: { category: { in: ['Дизайнерские', 'Стальные', 'Полотенцесушители', 'Секционные'] } },
+    }),
+    5,
+  );
   assert.equal((await shop.database.deliveryRate.findUnique({ where: { city: 'Санкт-Петербург' } })).price, 40000);
   const productsBefore = await shop.database.product.count();
   await seedDatabase();
@@ -95,17 +164,31 @@ test('разовая правка каталога 2026-10-01: убирает т
   const { runOnce, applyOneTimeFixes } = require('./one-time-fixes');
   const markerFile = path.join(path.dirname(process.env.DB_PATH), 'uploads', '.done-2026-10-01-catalog');
   assert.ok(fs.existsSync(markerFile), 'правка выполнилась при старте сервера');
-  assert.match((await shop.database.product.findFirst({ where: { name: 'Радиатор Loft Black' } })).photo_url, /cloudfront\.net\/.+\.png$/);
+  assert.match(
+    (await shop.database.product.findFirst({ where: { name: 'Радиатор Loft Black' } })).photo_url,
+    /cloudfront\.net\/.+\.png$/,
+  );
   fs.unlinkSync(markerFile);
-  const testProduct = await shop.database.product.create({ data: { name: 'Радиатор Test', description: 'Тестовое описание', price: 100, stock: 1 } });
+  const testProduct = await shop.database.product.create({
+    data: { name: 'Радиатор Test', description: 'Тестовое описание', price: 100, stock: 1 },
+  });
   await shop.database.cartItem.create({ data: { chat_id: 9301, product_id: testProduct.id, quantity: 1 } });
   await applyOneTimeFixes();
   assert.equal(await shop.database.product.findUnique({ where: { id: testProduct.id } }), null);
   assert.equal(await shop.database.cartItem.count({ where: { product_id: testProduct.id } }), 0);
   let runs = 0;
-  await runOnce('test-key', async () => { runs++; });
-  await runOnce('test-key', async () => { runs++; });
-  await runOnce('broken-key', async () => { throw new Error('сломалось'); });
+  await runOnce('test-key', async () => {
+    runs++;
+  });
+  await runOnce('test-key', async () => {
+    runs++;
+  });
+  await runOnce('broken-key', async () => {
+    throw new Error('сломалось');
+  });
   assert.equal(runs, 1);
-  assert.ok(!fs.existsSync(path.join(path.dirname(process.env.DB_PATH), 'uploads', '.done-broken-key')), 'упавшая правка повторится');
+  assert.ok(
+    !fs.existsSync(path.join(path.dirname(process.env.DB_PATH), 'uploads', '.done-broken-key')),
+    'упавшая правка повторится',
+  );
 });

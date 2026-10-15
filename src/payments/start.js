@@ -9,7 +9,10 @@ async function startPayment(orderId) {
   if (!order) throw new Error('Заказ не найден');
   const orderCode = order.order_code || String(order.id);
   const payment = await createPayment(orderId, order.total / 100, paymentDescription(orderCode));
-  await database.order.update({ where: { id: orderId }, data: { status: `awaiting_payment:${payment.id}`, payment_id: payment.id } });
+  await database.order.update({
+    where: { id: orderId },
+    data: { status: `awaiting_payment:${payment.id}`, payment_id: payment.id },
+  });
   return payment;
 }
 

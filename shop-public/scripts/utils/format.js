@@ -11,7 +11,12 @@ export function formatDateTime(databaseDate) {
   if (!databaseDate) return '';
   const date = new Date(String(databaseDate).replace(' ', 'T') + 'Z');
   if (isNaN(date)) return '';
-  return date.toLocaleString(isEnglish() ? 'en-GB' : 'ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleString(isEnglish() ? 'en-GB' : 'ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 /** «★★★★☆» по оценке 1–5 */

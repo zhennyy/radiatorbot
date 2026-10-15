@@ -4,10 +4,16 @@ const { translate } = require('../i18n');
 const customers = require('../customers');
 
 // Адрес витрины: SHOP_URL из .env (на сервере — https://<бот>.botforall.ru/shop/); RAILWAY_PUBLIC_DOMAIN — запасной вариант для облачных хостингов
-const SHOP_URL = process.env.SHOP_URL || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/shop/` : null);
+const SHOP_URL =
+  process.env.SHOP_URL ||
+  (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/shop/` : null);
 
 const formatPrice = (kopecks) => Math.round(kopecks / 100).toLocaleString('ru-RU') + ' ₽';
-const escapeHtml = (text) => String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escapeHtml = (text) =>
+  String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 const languageOf = (context) => customers.getLanguage(context.chat.id);
 
 // Постоянная клавиатура снизу — только если витрины нет.
@@ -30,7 +36,10 @@ function shopTabUrl(tab) {
 function shopKeyboard(language) {
   return Markup.inlineKeyboard([
     [Markup.button.webApp(translate(language, 'openShopBtn'), shopTabUrl())],
-    [Markup.button.webApp(translate(language, 'myOrdersBtn'), shopTabUrl('orders')), Markup.button.webApp(translate(language, 'aiPickBtn'), shopTabUrl('ai'))],
+    [
+      Markup.button.webApp(translate(language, 'myOrdersBtn'), shopTabUrl('orders')),
+      Markup.button.webApp(translate(language, 'aiPickBtn'), shopTabUrl('ai')),
+    ],
   ]);
 }
 
@@ -55,4 +64,15 @@ const bothLanguages = (key) => [translate('ru', key), translate('en', key)];
 // Если есть витрина — вместо старой кнопки показываем подсказку, иначе передаём дальше
 const redirectToShopIfAvailable = (context, next) => (SHOP_URL ? showShopHint(context) : next());
 
-module.exports = { SHOP_URL, formatPrice, escapeHtml, languageOf, buildMainMenu, shopKeyboard, dropOldKeyboard, showShopHint, bothLanguages, redirectToShopIfAvailable };
+module.exports = {
+  SHOP_URL,
+  formatPrice,
+  escapeHtml,
+  languageOf,
+  buildMainMenu,
+  shopKeyboard,
+  dropOldKeyboard,
+  showShopHint,
+  bothLanguages,
+  redirectToShopIfAvailable,
+};

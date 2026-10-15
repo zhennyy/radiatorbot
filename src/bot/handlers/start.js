@@ -2,7 +2,15 @@
 const { Markup } = require('telegraf');
 const { translate } = require('../../i18n');
 const customers = require('../../customers');
-const { SHOP_URL, languageOf, buildMainMenu, shopKeyboard, dropOldKeyboard, bothLanguages, redirectToShopIfAvailable } = require('../keyboards');
+const {
+  SHOP_URL,
+  languageOf,
+  buildMainMenu,
+  shopKeyboard,
+  dropOldKeyboard,
+  bothLanguages,
+  redirectToShopIfAvailable,
+} = require('../keyboards');
 
 function registerStartHandlers(bot) {
   bot.start(async (context) => {
@@ -27,8 +35,12 @@ function registerStartHandlers(bot) {
   bot.hears(bothLanguages('btnLanguage'), redirectToShopIfAvailable);
   bot.hears(bothLanguages('btnLanguage'), async (context) => {
     const language = await languageOf(context);
-    await context.reply(translate(language, 'chooseLanguage'),
-      Markup.inlineKeyboard([[Markup.button.callback('🇷🇺 Русский', 'lang_ru'), Markup.button.callback('🇬🇧 English', 'lang_en')]]));
+    await context.reply(
+      translate(language, 'chooseLanguage'),
+      Markup.inlineKeyboard([
+        [Markup.button.callback('🇷🇺 Русский', 'lang_ru'), Markup.button.callback('🇬🇧 English', 'lang_en')],
+      ]),
+    );
   });
 
   bot.action(/^lang_(ru|en)$/, async (context) => {
@@ -49,10 +61,12 @@ async function handleNameInput(context, next) {
     return context.reply(translate(language, 'askName'));
   }
   // Вместо имени сразу написали вопрос — не записываем его как имя: берём имя из Telegram, а сообщение передаём менеджеру
-  const looksLikeQuestion = enteredName.length > 30 || /[?!.,:;()\d]/.test(enteredName) || enteredName.split(/\s+/).length > 3;
+  const looksLikeQuestion =
+    enteredName.length > 30 || /[?!.,:;()\d]/.test(enteredName) || enteredName.split(/\s+/).length > 3;
   if (looksLikeQuestion) {
     await customers.setName(context.chat.id, (context.from.first_name || '').slice(0, 64) || '—');
-    if (SHOP_URL) await context.reply(translate(language, 'nameSavedShop', context.from.first_name || ''), shopKeyboard(language));
+    if (SHOP_URL)
+      await context.reply(translate(language, 'nameSavedShop', context.from.first_name || ''), shopKeyboard(language));
     return next();
   }
   await customers.setName(context.chat.id, enteredName);

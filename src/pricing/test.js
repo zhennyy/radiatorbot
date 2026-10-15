@@ -30,15 +30,23 @@ test('итог: скидка только на товары, самовывоз 
 });
 
 test('промокоды: пробелы и регистр не важны, выключенный и исчерпанный — понятная ошибка', async () => {
-  await shop.database.promoCode.createMany({ data: [
-    { code: 'ОТОПЛЕНИЕ', discount_percent: 15 },
-    { code: 'OLD', discount_percent: 5, active: 0 },
-    { code: 'LIMIT', discount_percent: 5, max_uses: 2, used_count: 2 },
-  ] });
+  await shop.database.promoCode.createMany({
+    data: [
+      { code: 'ОТОПЛЕНИЕ', discount_percent: 15 },
+      { code: 'OLD', discount_percent: 5, active: 0 },
+      { code: 'LIMIT', discount_percent: 5, max_uses: 2, used_count: 2 },
+    ],
+  });
   assert.deepEqual(await pricing.findPromo(' отопление '), { code: 'ОТОПЛЕНИЕ', percent: 15 });
   assert.deepEqual(await pricing.findPromo(''), { code: null, percent: 0 });
-  await assert.rejects(() => pricing.findPromo('old'), (promoError) => promoError.kind === 'notFound');
-  await assert.rejects(() => pricing.findPromo('limit'), (promoError) => promoError.kind === 'exhausted' && /закончился/.test(promoError.message));
+  await assert.rejects(
+    () => pricing.findPromo('old'),
+    (promoError) => promoError.kind === 'notFound',
+  );
+  await assert.rejects(
+    () => pricing.findPromo('limit'),
+    (promoError) => promoError.kind === 'exhausted' && /закончился/.test(promoError.message),
+  );
 });
 
 test('английское название города для истории заказов', async () => {

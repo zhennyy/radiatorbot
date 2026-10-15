@@ -24,14 +24,17 @@ export function cartTotals() {
 }
 
 /** Строки корзины: [{ product, quantity }] — только товары, которые есть в каталоге */
-export const cartLines = () => Object.entries(state.cart)
-  .map(([productId, quantity]) => ({ product: findProduct(productId), quantity }))
-  .filter((line) => line.product);
+export const cartLines = () =>
+  Object.entries(state.cart)
+    .map(([productId, quantity]) => ({ product: findProduct(productId), quantity }))
+    .filter((line) => line.product);
 
 /** Перерисовать всё, что показывает количество этого товара */
 function refreshProductEverywhere(productId) {
-  document.querySelectorAll(`[data-quantity-control-for="${productId}"]`).forEach((container) => { container.innerHTML = quantityControlHtml(findProduct(productId)); });
-  if (state.openProductId == productId) renderProductSheet();
+  document.querySelectorAll(`[data-quantity-control-for="${productId}"]`).forEach((container) => {
+    container.innerHTML = quantityControlHtml(findProduct(productId));
+  });
+  if (Number(state.openProductId) === Number(productId)) renderProductSheet();
   renderCart();
 }
 
@@ -41,14 +44,19 @@ export async function changeQuantity(productId, direction) {
   if (!product) return;
   const previous = state.cart[productId] || 0;
   const next = Math.max(0, previous + direction);
-  if (next > product.stock) { showToast(texts().noMoreInStock); return; }
-  if (next) state.cart[productId] = next; else delete state.cart[productId];
+  if (next > product.stock) {
+    showToast(texts().noMoreInStock);
+    return;
+  }
+  if (next) state.cart[productId] = next;
+  else delete state.cart[productId];
   vibrate(direction > 0 ? 'medium' : 'light');
   refreshProductEverywhere(productId);
   try {
     await callApi('/cart', { product_id: productId, qty: next });
   } catch (error) {
-    if (previous) state.cart[productId] = previous; else delete state.cart[productId];
+    if (previous) state.cart[productId] = previous;
+    else delete state.cart[productId];
     refreshProductEverywhere(productId);
     showToast(error.message);
   }

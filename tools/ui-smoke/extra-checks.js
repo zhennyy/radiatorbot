@@ -15,7 +15,10 @@ async function runBuyerChecks(runner) {
   const linksBefore = (await buyer.evaluate(() => window.__telegramLog.links)).length;
   await buyer.locator('#v-orders .btn.pay').first().click();
   await settle(buyer, { keepToast: true });
-  check('«Оплатить» у неоплаченного заказа открывает ссылку', (await buyer.evaluate(() => window.__telegramLog.links)).length === linksBefore + 1);
+  check(
+    '«Оплатить» у неоплаченного заказа открывает ссылку',
+    (await buyer.evaluate(() => window.__telegramLog.links)).length === linksBefore + 1,
+  );
   await tabButton(buyer, 'AI-подбор').click();
   await buyer.fill('#aiQ', 'что-нибудь в ванную');
   await buyer.click('#aiGo');
@@ -64,16 +67,24 @@ async function runOwnerChecks(runner, shop) {
   await owner.waitForSelector('#admBody .kpis');
   await owner.locator('#admBody .aline', { hasText: 'Loft Black' }).click();
   await owner.waitForSelector('#pform');
-  check('из «Заканчивается» открывается редактор товара', /Loft Black/.test(await owner.inputValue('#pform input[name="name"]')));
+  check(
+    'из «Заканчивается» открывается редактор товара',
+    /Loft Black/.test(await owner.inputValue('#pform input[name="name"]')),
+  );
   await closeSheetByVeil(owner);
 
   await owner.locator('#admBody .aline', { hasText: 'Milano' }).click();
-  await owner.locator('#sheet .x').click({ timeout: 3000 }).catch(() => {});
+  await owner
+    .locator('#sheet .x')
+    .click({ timeout: 3000 })
+    .catch(() => {});
   check('крестик в редакторе товара с фото закрывает шторку', !(await isSheetOpen(owner)));
   if (await isSheetOpen(owner)) await closeSheetByVeil(owner);
   // Enter в поле названия не должен отправлять «фото по ссылке» (первая кнопка формы)
   const photoUrlRequests = [];
-  owner.on('request', (request) => { if (request.url().includes('/photo-url')) photoUrlRequests.push(request.url()); });
+  owner.on('request', (request) => {
+    if (request.url().includes('/photo-url')) photoUrlRequests.push(request.url());
+  });
   await owner.locator('#admBody .aline', { hasText: 'Nova Grande' }).click();
   await owner.locator('#pform input[name="name"]').press('Enter');
   await settle(owner, { keepToast: true });
@@ -84,7 +95,9 @@ async function runOwnerChecks(runner, shop) {
   await owner.waitForSelector('#admBody .prow');
   const pageWidth = await owner.evaluate(() => document.documentElement.scrollWidth);
   check('настройки не шире экрана телефона', pageWidth <= VIEWPORT.width, String(pageWidth));
-  const moscowPrice = owner.locator('#admBody .crow', { has: owner.locator('input.cn[value="Москва"]') }).locator('.cp');
+  const moscowPrice = owner
+    .locator('#admBody .crow', { has: owner.locator('input.cn[value="Москва"]') })
+    .locator('.cp');
   await moscowPrice.fill('750');
   await moscowPrice.dispatchEvent('change');
   await settle(owner, { keepToast: true });
@@ -99,7 +112,11 @@ async function runOwnerChecks(runner, shop) {
   check('промокод удаляется', !(await shop.database.promoCode.findFirst({ where: { code: 'WINTER15' } })));
   await owner.locator('#admBody .btn', { hasText: 'Получить копию' }).click();
   await settle(owner, { keepToast: true });
-  check('резервная копия запрошена', /архив|копи/i.test(await owner.locator('#toast').innerText()), await owner.locator('#toast').innerText());
+  check(
+    'резервная копия запрошена',
+    /архив|копи/i.test(await owner.locator('#toast').innerText()),
+    await owner.locator('#toast').innerText(),
+  );
   await owner.context().close();
 }
 

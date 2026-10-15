@@ -4,7 +4,11 @@ const { ValidationError, createValidator, cleanText } = require('../../validatio
 const MIN_PHONE_DIGITS = 10;
 
 // Поля доставки из формы витрины — так их ждёт pricing.resolveDelivery
-const readDeliveryForm = (requestBody) => ({ method: requestBody.delivery, city: requestBody.city, address: requestBody.address });
+const readDeliveryForm = (requestBody) => ({
+  method: requestBody.delivery,
+  city: requestBody.city,
+  address: requestBody.address,
+});
 
 const promoPostValidator = createValidator((request) => ({ promoCode: request.body.code }));
 
@@ -12,7 +16,8 @@ const promoPostValidator = createValidator((request) => ({ promoCode: request.bo
 const orderPostValidator = createValidator((request) => {
   const requestBody = request.body || {};
   const phone = cleanText(requestBody.phone, 30);
-  if (phone && phone.replace(/\D/g, '').length < MIN_PHONE_DIGITS) throw new ValidationError('Проверьте номер телефона');
+  if (phone && phone.replace(/\D/g, '').length < MIN_PHONE_DIGITS)
+    throw new ValidationError('Проверьте номер телефона');
   return { deliveryForm: readDeliveryForm(requestBody), promoCode: requestBody.promo, phone };
 });
 

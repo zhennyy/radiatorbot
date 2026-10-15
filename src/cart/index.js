@@ -28,7 +28,9 @@ async function getCartQuantities(chatId) {
 }
 
 async function getQuantityInCart(chatId, productId) {
-  const cartRow = await database.cartItem.findUnique({ where: { chat_id_product_id: { chat_id: Number(chatId), product_id: productId } } });
+  const cartRow = await database.cartItem.findUnique({
+    where: { chat_id_product_id: { chat_id: Number(chatId), product_id: productId } },
+  });
   return cartRow ? cartRow.quantity : 0;
 }
 
@@ -44,7 +46,11 @@ async function setCartQuantity(chatId, productId, quantity) {
     await database.cartItem.deleteMany({ where: key });
     return;
   }
-  await database.cartItem.upsert({ where: { chat_id_product_id: key }, create: { ...key, quantity }, update: { quantity } });
+  await database.cartItem.upsert({
+    where: { chat_id_product_id: key },
+    create: { ...key, quantity },
+    update: { quantity },
+  });
 }
 
 async function changeCartQuantityBy(chatId, productId, change) {
@@ -55,4 +61,13 @@ async function changeCartQuantityBy(chatId, productId, change) {
 const removeFromCart = (chatId, productId) => setCartQuantity(chatId, productId, 0);
 const clearCart = (chatId) => database.cartItem.deleteMany({ where: { chat_id: Number(chatId) } });
 
-module.exports = { getCart, getCartQuantities, getQuantityInCart, countCartUnits, setCartQuantity, changeCartQuantityBy, removeFromCart, clearCart };
+module.exports = {
+  getCart,
+  getCartQuantities,
+  getQuantityInCart,
+  countCartUnits,
+  setCartQuantity,
+  changeCartQuantityBy,
+  removeFromCart,
+  clearCart,
+};

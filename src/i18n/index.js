@@ -30,8 +30,10 @@ const STRINGS = {
     noMoreStock: 'Больше нет в наличии',
     cartChanged: 'Корзина изменилась, пока вы оформляли заказ. Проверьте её и нажмите «Оформить» ещё раз 🙏',
     openShopText: 'Весь каталог — в нашей витрине 👇',
-    welcomeBackShop: (name) => `С возвращением, ${name}! 🔥\nЭто RadiatorPro — радиаторы и полотенцесушители с доставкой.\n\nЖми кнопку, чтобы открыть каталог. А если есть вопрос — просто напиши его сюда 💬`,
-    nameSavedShop: (name) => `Приятно познакомиться, ${name}! 👋\nЭто RadiatorPro — радиаторы и полотенцесушители с доставкой.\n\nЖми кнопку, чтобы открыть каталог. А если есть вопрос — просто напиши его сюда 💬`,
+    welcomeBackShop: (name) =>
+      `С возвращением, ${name}! 🔥\nЭто RadiatorPro — радиаторы и полотенцесушители с доставкой.\n\nЖми кнопку, чтобы открыть каталог. А если есть вопрос — просто напиши его сюда 💬`,
+    nameSavedShop: (name) =>
+      `Приятно познакомиться, ${name}! 👋\nЭто RadiatorPro — радиаторы и полотенцесушители с доставкой.\n\nЖми кнопку, чтобы открыть каталог. А если есть вопрос — просто напиши его сюда 💬`,
     welcomeShop: 'Добро пожаловать в RadiatorPro 🔥',
     myOrdersBtn: '📦 Мои заказы',
     aiPickBtn: '✨ AI-подбор',
@@ -151,8 +153,10 @@ const STRINGS = {
     noMoreStock: 'No more in stock',
     cartChanged: 'Your cart changed while you were checking out. Please review it and tap «Checkout» again 🙏',
     openShopText: 'The whole catalog is in our shop 👇',
-    welcomeBackShop: (name) => `Welcome back, ${name}! 🔥\nThis is RadiatorPro — radiators and towel warmers with delivery.\n\nTap the button to open the catalog. Have a question? Just write it here 💬`,
-    nameSavedShop: (name) => `Nice to meet you, ${name}! 👋\nThis is RadiatorPro — radiators and towel warmers with delivery.\n\nTap the button to open the catalog. Have a question? Just write it here 💬`,
+    welcomeBackShop: (name) =>
+      `Welcome back, ${name}! 🔥\nThis is RadiatorPro — radiators and towel warmers with delivery.\n\nTap the button to open the catalog. Have a question? Just write it here 💬`,
+    nameSavedShop: (name) =>
+      `Nice to meet you, ${name}! 👋\nThis is RadiatorPro — radiators and towel warmers with delivery.\n\nTap the button to open the catalog. Have a question? Just write it here 💬`,
     welcomeShop: 'Welcome to RadiatorPro 🔥',
     myOrdersBtn: '📦 My orders',
     aiPickBtn: '✨ AI pick',
@@ -235,7 +239,8 @@ const STRINGS = {
     paymentError: 'Could not create a payment. Check the ЮKassa settings in .env and try again.',
 
     // === payment & shipping notifications ===
-    paymentReceived: (name, id) => `${name ? name + ', y' : 'Y'}our payment has been received! Order #${id} is now being processed. ✅`,
+    paymentReceived: (name, id) =>
+      `${name ? name + ', y' : 'Y'}our payment has been received! Order #${id} is now being processed. ✅`,
     orderShipped: (name, id) => `${name ? name + ', y' : 'Y'}our order #${id} has shipped! 🚚`,
 
     // === language switch ===

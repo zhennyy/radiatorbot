@@ -5,7 +5,8 @@ const { ValidationError, createValidator, parsePositiveId } = require('../../val
 // Новый статус: только «в работе» или «отменён»; трек-номер — по желанию
 const orderStatusValidator = createValidator((request) => {
   const newStatus = String(request.body.status || '');
-  if (!orders.PAID_STATUSES.has(newStatus) && newStatus !== 'cancelled') throw new ValidationError('Неизвестный статус');
+  if (!orders.PAID_STATUSES.has(newStatus) && newStatus !== 'cancelled')
+    throw new ValidationError('Неизвестный статус');
   return {
     orderId: parsePositiveId(request.params.id),
     newStatus,

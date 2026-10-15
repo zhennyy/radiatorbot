@@ -6,7 +6,8 @@ const REQUESTS_PER_MINUTE = 240;
 const ONE_MINUTE_MS = 60000;
 const MAX_TRACKED_KEYS = 5000;
 
-const isOwnerChat = (chatId) => Boolean(process.env.OWNER_CHAT_ID) && String(chatId) === String(process.env.OWNER_CHAT_ID);
+const isOwnerChat = (chatId) =>
+  Boolean(process.env.OWNER_CHAT_ID) && String(chatId) === String(process.env.OWNER_CHAT_ID);
 
 // Пользователь Telegram из заголовка X-Init-Data, если подпись верна (проверяем токеном бота)
 function verifyTelegramUser(request) {
@@ -14,10 +15,17 @@ function verifyTelegramUser(request) {
   const receivedHash = initData.get('hash');
   if (!receivedHash) return null;
   initData.delete('hash');
-  const dataCheckString = [...initData.entries()].map(([fieldName, fieldValue]) => `${fieldName}=${fieldValue}`).sort().join('\n');
+  const dataCheckString = [...initData.entries()]
+    .map(([fieldName, fieldValue]) => `${fieldName}=${fieldValue}`)
+    .sort()
+    .join('\n');
   const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN).digest();
   const expectedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-  if (expectedHash.length !== receivedHash.length || !crypto.timingSafeEqual(Buffer.from(expectedHash), Buffer.from(receivedHash))) return null;
+  if (
+    expectedHash.length !== receivedHash.length ||
+    !crypto.timingSafeEqual(Buffer.from(expectedHash), Buffer.from(receivedHash))
+  )
+    return null;
   if (Date.now() / 1000 - Number(initData.get('auth_date') || 0) > INIT_DATA_MAX_AGE_SECONDS) return null;
   try {
     return JSON.parse(initData.get('user'));
@@ -36,7 +44,8 @@ function createRateLimiter() {
     requestTimesByKey.set(key, recentRequests);
     if (requestTimesByKey.size > MAX_TRACKED_KEYS) {
       for (const [trackedKey, requestTimes] of requestTimesByKey) {
-        if (!requestTimes.length || now - requestTimes[requestTimes.length - 1] > windowMs) requestTimesByKey.delete(trackedKey);
+        if (!requestTimes.length || now - requestTimes[requestTimes.length - 1] > windowMs)
+          requestTimesByKey.delete(trackedKey);
       }
     }
     return recentRequests.length <= maxRequests;
@@ -49,10 +58,12 @@ function createAuthMiddlewares(isRequestAllowed) {
     const telegramUser = verifyTelegramUser(request);
     if (!telegramUser || !telegramUser.id) return response.status(401).json({ error: 'Откройте магазин из Telegram' });
     request.chatId = telegramUser.id;
-    if (!isRequestAllowed('all:' + telegramUser.id, REQUESTS_PER_MINUTE, ONE_MINUTE_MS)) return response.status(429).json({ error: 'Слишком часто, подождите минуту' });
+    if (!isRequestAllowed('all:' + telegramUser.id, REQUESTS_PER_MINUTE, ONE_MINUTE_MS))
+      return response.status(429).json({ error: 'Слишком часто, подождите минуту' });
     return next();
   };
-  const ownerOnly = (request, response, next) => (isOwnerChat(request.chatId) ? next() : response.status(403).json({ error: 'Только для владелицы' }));
+  const ownerOnly = (request, response, next) =>
+    isOwnerChat(request.chatId) ? next() : response.status(403).json({ error: 'Только для владелицы' });
   return {
     shopAuth,
     ownerOnly,

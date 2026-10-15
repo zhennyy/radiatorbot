@@ -21,8 +21,16 @@ async function runOwnerScreens(runner, shop) {
   await page.click('#trackGo');
   await snap(page, 'o05-order-shipped', { keepToast: true });
   const shipped = await shop.database.order.findFirst({ where: { address: { contains: 'Невский' } } });
-  check('статус заказа сменился на «отправлен» с трек-номером', shipped.status === 'shipped' && shipped.track === 'RA123456789RU', `${shipped.status} ${shipped.track}`);
-  await page.locator('#admBody .order', { hasText: 'Самовывоз' }).first().locator('.btn', { hasText: 'Начать сборку' }).click();
+  check(
+    'статус заказа сменился на «отправлен» с трек-номером',
+    shipped.status === 'shipped' && shipped.track === 'RA123456789RU',
+    `${shipped.status} ${shipped.track}`,
+  );
+  await page
+    .locator('#admBody .order', { hasText: 'Самовывоз' })
+    .first()
+    .locator('.btn', { hasText: 'Начать сборку' })
+    .click();
   await snap(page, 'o06-order-assembling');
 
   await adminSection(page, 'Статистика').click();
@@ -53,7 +61,11 @@ async function runOwnerScreens(runner, shop) {
   await page.locator('#pform .btn', { hasText: 'Сохранить' }).click();
   await snap(page, 'o14-products-after-edit', { keepToast: true });
   const edited = await shop.database.product.findUnique({ where: { id: 3 } });
-  check('товар изменён', edited.name === 'Полотенцесушитель Elegance Plus' && edited.stock === 42, `${edited.name} ${edited.stock}`);
+  check(
+    'товар изменён',
+    edited.name === 'Полотенцесушитель Elegance Plus' && edited.stock === 42,
+    `${edited.name} ${edited.stock}`,
+  );
 
   await adminSection(page, 'Чаты').click();
   await page.waitForSelector('#admBody .aline');
@@ -64,7 +76,10 @@ async function runOwnerScreens(runner, shop) {
   await page.fill('#reply', 'Подойдёт, могу отложить для вас 🙂');
   await page.click('#sendReply');
   await page.waitForFunction(() => document.querySelectorAll('#msgs .msg.me').length === 2);
-  check('ответ покупателю отправлен', shop.sent.some((message) => /отложить для вас/.test(message.text)));
+  check(
+    'ответ покупателю отправлен',
+    shop.sent.some((message) => /отложить для вас/.test(message.text)),
+  );
   await page.locator('#admBody .mini', { hasText: 'Чаты' }).click();
   await page.waitForSelector('#admBody .aline');
 

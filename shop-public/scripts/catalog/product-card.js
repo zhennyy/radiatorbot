@@ -15,15 +15,17 @@ function stockTagHtml(product) {
 }
 
 /** Счётчик «− количество +» (карточка, шторка, корзина) */
-export const quantityStepperHtml = (product, quantity) => `<div class="step"><button data-action="cart-remove-one" data-product-id="${product.id}">−</button>`
-  + `<span>${quantity}</span>`
-  + `<button data-action="cart-add" data-product-id="${product.id}">+</button></div>`;
+export const quantityStepperHtml = (product, quantity) =>
+  `<div class="step"><button data-action="cart-remove-one" data-product-id="${product.id}">−</button>` +
+  `<span>${quantity}</span>` +
+  `<button data-action="cart-add" data-product-id="${product.id}">+</button></div>`;
 
 /** Кнопка «+» или счётчик «− количество +» для товара */
 export function quantityControlHtml(product) {
   const quantity = state.cart[product.id] || 0;
   if (product.stock <= 0) return '<button class="add" disabled>+</button>';
-  if (!quantity) return `<button class="add" data-action="cart-add" data-product-id="${product.id}" aria-label="${texts().addToCart}">+</button>`;
+  if (!quantity)
+    return `<button class="add" data-action="cart-add" data-product-id="${product.id}" aria-label="${texts().addToCart}">+</button>`;
   return quantityStepperHtml(product, quantity);
 }
 

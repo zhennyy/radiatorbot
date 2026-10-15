@@ -8,12 +8,18 @@ import { orderStatusLabel } from '../admin-state.js';
 function nextStep(order) {
   switch (order.status) {
     case 'awaiting_payment':
-    case 'pending': return ['paid', '✅ Оплачен (вручную)'];
-    case 'paid': return ['assembling', '📦 Начать сборку'];
-    case 'assembling': return ['shipped', order.pickup ? '🏠 Готов к выдаче' : '🚚 Отправить'];
-    case 'shipped': return ['delivered', order.pickup ? '✅ Выдан' : '✅ Доставлен'];
-    case 'cancelled': return ['paid', order.was_paid ? '↩️ Вернуть в работу' : '✅ Оплачен (вручную)'];
-    default: return null;
+    case 'pending':
+      return ['paid', '✅ Оплачен (вручную)'];
+    case 'paid':
+      return ['assembling', '📦 Начать сборку'];
+    case 'assembling':
+      return ['shipped', order.pickup ? '🏠 Готов к выдаче' : '🚚 Отправить'];
+    case 'shipped':
+      return ['delivered', order.pickup ? '✅ Выдан' : '✅ Доставлен'];
+    case 'cancelled':
+      return ['paid', order.was_paid ? '↩️ Вернуть в работу' : '✅ Оплачен (вручную)'];
+    default:
+      return null;
   }
 }
 
@@ -22,15 +28,20 @@ function detailsLine(order) {
     order.promo ? `🎟 ${escapeHtml(order.promo)} −${order.discount}%` : '',
     order.track ? `🚚 Трек: <b>${escapeHtml(order.track)}</b>` : '',
     order.rating ? formatStars(order.rating) : '',
-  ].filter(Boolean).join(' · ');
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
-const statusButton = (order, status, label, classes = 'btn') => `<button class="${classes}" data-action="change-order-status" data-order-id="${order.id}" data-status="${status}">${label}</button>`;
+const statusButton = (order, status, label, classes = 'btn') =>
+  `<button class="${classes}" data-action="change-order-status" data-order-id="${order.id}" data-status="${status}">${label}</button>`;
 
 export function adminOrderCardHtml(order) {
   const next = nextStep(order);
   const details = detailsLine(order);
-  const phoneLink = order.phone ? `<a class="mini" href="tel:${escapeHtml(order.phone.replace(/[^\d+]/g, ''))}">📞 ${escapeHtml(order.phone)}</a>` : '';
+  const phoneLink = order.phone
+    ? `<a class="mini" href="tel:${escapeHtml(order.phone.replace(/[^\d+]/g, ''))}">📞 ${escapeHtml(order.phone)}</a>`
+    : '';
   return `
     <div class="order" id="ord-${order.id}">
       <div class="top"><span class="code">№ ${escapeHtml(order.code)}${order.buyer ? ' · ' + escapeHtml(order.buyer) : ''}</span><span class="pill ${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order))}</span></div>

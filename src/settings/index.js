@@ -16,7 +16,11 @@ async function getSetting(key, fallbackValue) {
 
 async function setSetting(key, value) {
   const serializedValue = JSON.stringify(value);
-  await database.setting.upsert({ where: { key }, create: { key, value: serializedValue }, update: { value: serializedValue } });
+  await database.setting.upsert({
+    where: { key },
+    create: { key, value: serializedValue },
+    update: { value: serializedValue },
+  });
 }
 
 // Доставка: цена для городов не из списка, бесплатно от суммы, самовывоз

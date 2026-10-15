@@ -13,14 +13,25 @@ async function saveSettings(path, body, successMessage) {
     renderSettings();
     if (successMessage) showToast(successMessage);
     vibrate('light');
-  } catch (error) { showToast(error.message); }
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
 const fieldValue = (id) => getElement(id).value;
 const isChecked = (id) => getElement(id).checked;
 
 function saveDelivery() {
-  saveSettings('/admin/delivery', { otherPrice: fieldValue('dOther'), freeFrom: fieldValue('dFree'), pickup: isChecked('dPickup'), pickupAddress: fieldValue('dPickupAddr') }, 'Доставка сохранена ✓');
+  saveSettings(
+    '/admin/delivery',
+    {
+      otherPrice: fieldValue('dOther'),
+      freeFrom: fieldValue('dFree'),
+      pickup: isChecked('dPickup'),
+      pickupAddress: fieldValue('dPickupAddr'),
+    },
+    'Доставка сохранена ✓',
+  );
 }
 
 async function deleteAfterConfirm(question, path) {
@@ -29,9 +40,22 @@ async function deleteAfterConfirm(question, path) {
 
 export const settingsActions = {
   'save-delivery': () => saveDelivery(),
-  'add-city': () => saveSettings('/admin/cities', { city: fieldValue('ncity'), price: fieldValue('nprice') }, 'Город добавлен ✓'),
-  'delete-city': (element) => deleteAfterConfirm('Удалить город из списка доставки?', `/admin/cities/${element.dataset.cityId}/delete`),
-  'add-promo': () => saveSettings('/admin/promos', { code: fieldValue('pcode'), percent: fieldValue('ppct'), max_uses: fieldValue('pmax') }, 'Промокод создан ✓'),
-  'toggle-promo': (checkbox) => saveSettings(`/admin/promos/${checkbox.dataset.promoId}`, { active: checkbox.checked }, checkbox.checked ? 'Промокод включён' : 'Промокод выключен'),
-  'delete-promo': (element) => deleteAfterConfirm('Удалить промокод?', `/admin/promos/${element.dataset.promoId}/delete`),
+  'add-city': () =>
+    saveSettings('/admin/cities', { city: fieldValue('ncity'), price: fieldValue('nprice') }, 'Город добавлен ✓'),
+  'delete-city': (element) =>
+    deleteAfterConfirm('Удалить город из списка доставки?', `/admin/cities/${element.dataset.cityId}/delete`),
+  'add-promo': () =>
+    saveSettings(
+      '/admin/promos',
+      { code: fieldValue('pcode'), percent: fieldValue('ppct'), max_uses: fieldValue('pmax') },
+      'Промокод создан ✓',
+    ),
+  'toggle-promo': (checkbox) =>
+    saveSettings(
+      `/admin/promos/${checkbox.dataset.promoId}`,
+      { active: checkbox.checked },
+      checkbox.checked ? 'Промокод включён' : 'Промокод выключен',
+    ),
+  'delete-promo': (element) =>
+    deleteAfterConfirm('Удалить промокод?', `/admin/promos/${element.dataset.promoId}/delete`),
 };

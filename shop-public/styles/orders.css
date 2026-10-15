@@ -1,23 +1,122 @@
 /* Заказы: карточка заказа (у покупателя и в админке), статусы, трекер этапов */
-.order{background:var(--card);border-radius:16px;padding:14px;margin-bottom:10px}
-.order .top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
-.order .code{font-weight:800}
-.order ul{margin:0;padding:0;list-style:none;color:var(--muted);font-size:14px}
-.order li{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
-.order .sum{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-weight:700}
-.order .meta{font-size:12px;color:var(--muted);margin-top:6px}
-.order .pay{margin-top:10px}
-.pill.paid{background:rgba(47,158,68,.12);color:var(--ok)} .pill.shipped,.pill.delivered{background:rgba(25,113,194,.12);color:#1971c2}
-.pill.cancelled{background:rgba(201,42,42,.1);color:var(--bad)}
-.pill.assembling{background:var(--accent-soft);color:var(--accent)}
+.order {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.order .top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.order .code {
+  font-weight: 800;
+}
+.order ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 14px;
+}
+.order li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+.order .sum {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-weight: 700;
+}
+.order .meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.order .pay {
+  margin-top: 10px;
+}
+.pill.paid {
+  background: rgba(47, 158, 68, 0.12);
+  color: var(--ok);
+}
+.pill.shipped,
+.pill.delivered {
+  background: rgba(25, 113, 194, 0.12);
+  color: #1971c2;
+}
+.pill.cancelled {
+  background: rgba(201, 42, 42, 0.1);
+  color: var(--bad);
+}
+.pill.assembling {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 
 /* трекер заказа у покупателя */
-.steps{display:flex;align-items:flex-start;margin:4px 0 12px}
-.steps div{flex:1;text-align:center;font-size:11.5px;color:var(--muted);position:relative}
-.steps div::before{content:'';display:block;width:14px;height:14px;border-radius:50%;background:var(--line);margin:0 auto 5px;position:relative;z-index:1}
-.steps div::after{content:'';position:absolute;top:6px;left:-50%;width:100%;height:2px;background:var(--line)}
-.steps div:first-child::after{display:none}
-.steps div.done::before,.steps div.done::after,.steps div.now::after{background:var(--ok)}
-.steps div.now::before{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
-.steps div.now{color:var(--text);font-weight:700}
-.track{margin-top:8px;font-size:14px} .stars{margin-top:6px;color:#f59f00;letter-spacing:2px}
+.steps {
+  display: flex;
+  align-items: flex-start;
+  margin: 4px 0 12px;
+}
+.steps div {
+  flex: 1;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--muted);
+  position: relative;
+}
+.steps div::before {
+  content: '';
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--line);
+  margin: 0 auto 5px;
+  position: relative;
+  z-index: 1;
+}
+.steps div::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: -50%;
+  width: 100%;
+  height: 2px;
+  background: var(--line);
+}
+.steps div:first-child::after {
+  display: none;
+}
+.steps div.done::before,
+.steps div.done::after,
+.steps div.now::after {
+  background: var(--ok);
+}
+.steps div.now::before {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.steps div.now {
+  color: var(--text);
+  font-weight: 700;
+}
+.track {
+  margin-top: 8px;
+  font-size: 14px;
+}
+.stars {
+  margin-top: 6px;
+  color: #f59f00;
+  letter-spacing: 2px;
+}

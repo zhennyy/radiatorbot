@@ -37,7 +37,11 @@ async function uploadSelectedPhoto(event) {
   try {
     showToast('Загружаю фото…');
     const jpeg = await resizeToJpeg(file);
-    const response = await fetch(`/shop-api/admin/products/${productId}/photo`, { method: 'POST', headers: { 'Content-Type': 'image/jpeg', ...authHeaders() }, body: jpeg });
+    const response = await fetch(`/shop-api/admin/products/${productId}/photo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'image/jpeg', ...authHeaders() },
+      body: jpeg,
+    });
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Не получилось загрузить');
     showToast('Фото обновлено ✓');
     vibrate('medium');

@@ -2,7 +2,7 @@
 import { state } from '../state.js';
 import { isEnglish } from '../i18n.js';
 
-export const findProduct = (productId) => state.products.find((product) => product.id == productId);
+export const findProduct = (productId) => state.products.find((product) => product.id === Number(productId));
 
 export const productName = (product) => (isEnglish() && product.name_en) || product.name;
 export const productDescription = (product) => (isEnglish() && product.description_en) || product.description || '';

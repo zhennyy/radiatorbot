@@ -18,9 +18,19 @@ before(async () => {
 test('данные для оформления: города, доставка, самовывоз, онлайн-оплата', async () => {
   const response = await shop.call(BUYER_ID, 'GET', '/shop-api/checkout-info');
   assert.equal(response.status, 200);
-  assert.deepEqual(Object.keys(response.body).sort(), ['cities', 'freeFrom', 'otherPrice', 'payOnline', 'pickup', 'pickupAddress']);
+  assert.deepEqual(Object.keys(response.body).sort(), [
+    'cities',
+    'freeFrom',
+    'otherPrice',
+    'payOnline',
+    'pickup',
+    'pickupAddress',
+  ]);
   assert.equal(response.body.cities.length, 6);
-  assert.deepEqual(response.body.cities.find((rate) => rate.city === 'Москва'), { city: 'Москва', city_en: 'Moscow', price: 70000 });
+  assert.deepEqual(
+    response.body.cities.find((rate) => rate.city === 'Москва'),
+    { city: 'Москва', city_en: 'Moscow', price: 70000 },
+  );
   assert.equal(response.body.otherPrice, 150000);
   assert.equal(response.body.pickup, true);
   assert.equal(response.body.payOnline, true);
@@ -40,7 +50,13 @@ test('самовывоз: заказ создан, доставка 0, корз�
   assert.equal(order.address, 'Самовывоз · тел. +7 900 123-45-67');
   assert.equal(await countCartRows(BUYER_ID), 0);
   assert.equal(actions.lastPayment().body.description, `Заказ #${response.body.code} в RadiatorPro`);
-  assert.ok(shop.sent.some((message) => message.chat === BUYER_ID && message.extra?.reply_markup?.inline_keyboard?.[0]?.[0]?.url === response.body.pay_url));
+  assert.ok(
+    shop.sent.some(
+      (message) =>
+        message.chat === BUYER_ID &&
+        message.extra?.reply_markup?.inline_keyboard?.[0]?.[0]?.url === response.body.pay_url,
+    ),
+  );
   assert.equal((await placeOrder({ delivery: 'pickup' })).status, 400); // корзина пуста
 });
 
@@ -72,11 +88,19 @@ test('ошибки формы: город, адрес, телефон', async ()
 
 test('промокод даёт скидку на товары, бесплатная доставка от суммы, самовывоз можно выключить', async () => {
   await shop.call(testHelpers.OWNER_ID, 'POST', '/shop-api/admin/promos', { code: 'TEPLO10', percent: 10 });
-  await shop.call(testHelpers.OWNER_ID, 'POST', '/shop-api/admin/delivery', { otherPrice: 1500, freeFrom: 10000, pickup: false, pickupAddress: '' });
+  await shop.call(testHelpers.OWNER_ID, 'POST', '/shop-api/admin/delivery', {
+    otherPrice: 1500,
+    freeFrom: 10000,
+    pickup: false,
+    pickupAddress: '',
+  });
   const product = await shop.database.product.findFirst({ where: { name: 'Радиатор Milano Bianco' } });
   await actions.setCart(BUYER_ID, [[product.id, 1]]);
   assert.match((await placeOrder({ delivery: 'pickup' })).body.error, /Самовывоза сейчас нет/);
-  assert.equal((await placeOrder({ delivery: 'city', city: 'Москва', address: 'ул. Ленина, 1', promo: 'НЕТ' })).status, 400);
+  assert.equal(
+    (await placeOrder({ delivery: 'city', city: 'Москва', address: 'ул. Ленина, 1', promo: 'НЕТ' })).status,
+    400,
+  );
   const response = await placeOrder({ delivery: 'city', city: 'Москва', address: 'ул. Ленина, 1', promo: ' teplo10 ' });
   assert.equal(response.status, 200, JSON.stringify(response.body));
   const order = await actions.findOrder(response.body.id);
@@ -84,7 +108,12 @@ test('промокод даёт скидку на товары, бесплатн
   assert.equal(order.discount_percent, 10);
   assert.equal(order.delivery_cost, 0, '13 410 ₽ ≥ 10 000 ₽ — доставка бесплатно');
   assert.equal(order.total, Math.round(product.price * 0.9));
-  await shop.call(testHelpers.OWNER_ID, 'POST', '/shop-api/admin/delivery', { otherPrice: 1500, freeFrom: '', pickup: true, pickupAddress: '' });
+  await shop.call(testHelpers.OWNER_ID, 'POST', '/shop-api/admin/delivery', {
+    otherPrice: 1500,
+    freeFrom: '',
+    pickup: true,
+    pickupAddress: '',
+  });
 });
 
 test('сбой создания оплаты: заказ отменён, корзина сохранена', async () => {
@@ -92,7 +121,9 @@ test('сбой создания оплаты: заказ отменён, кор�
   const originalPost = axios.post;
   const [product] = await actions.productsInStock();
   await actions.setCart(BUYER_ID, [[product.id, 1]]);
-  axios.post = async () => { throw new Error('boom'); };
+  axios.post = async () => {
+    throw new Error('boom');
+  };
   const response = await placeOrder({ delivery: 'pickup', phone: '89001234567' });
   axios.post = originalPost;
   assert.equal(response.status, 502);
@@ -114,7 +145,8 @@ test('нехватка товара при оформлении', async () => {
 
 test('промокоды нельзя подбирать: после 12 попыток — 429', async () => {
   let lastResponse;
-  for (let attempt = 0; attempt < 14; attempt++) lastResponse = await shop.call(8001, 'POST', '/shop-api/promo', { code: 'NOPE' + attempt });
+  for (let attempt = 0; attempt < 14; attempt++)
+    lastResponse = await shop.call(8001, 'POST', '/shop-api/promo', { code: 'NOPE' + attempt });
   assert.equal(lastResponse.status, 429);
 });
 

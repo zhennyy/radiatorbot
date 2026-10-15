@@ -43,5 +43,8 @@ test('неизвестный статус и чужие руки отклоня�
   assert.equal((await changeStatus(OWNER_ID, { status: 'awaiting_payment' })).status, 400);
   assert.equal((await changeStatus(OWNER_ID, { status: 'взломан' })).status, 400);
   assert.equal((await changeStatus(BUYER_ID, { status: 'delivered' })).status, 403);
-  assert.equal((await shop.call(OWNER_ID, 'POST', '/shop-api/admin/orders/999999/status', { status: 'delivered' })).status, 400);
+  assert.equal(
+    (await shop.call(OWNER_ID, 'POST', '/shop-api/admin/orders/999999/status', { status: 'delivered' })).status,
+    400,
+  );
 });

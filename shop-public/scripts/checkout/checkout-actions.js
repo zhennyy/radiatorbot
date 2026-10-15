@@ -18,13 +18,17 @@ const MIN_ADDRESS_LENGTH = 5;
 
 /** Значения по умолчанию: Петербург (или первый город из списка) */
 function prefillForm(info) {
-  if (!checkoutForm.city && info.cities.length) checkoutForm.city = (info.cities.find((city) => /петербург/i.test(city.city)) || info.cities[0]).city;
+  if (!checkoutForm.city && info.cities.length)
+    checkoutForm.city = (info.cities.find((city) => /петербург/i.test(city.city)) || info.cities[0]).city;
   if (!checkoutForm.city) checkoutForm.city = OTHER_CITY;
   if (!info.pickup) checkoutForm.delivery = 'city';
 }
 
 export async function openCheckout() {
-  if (!cartTotals().itemCount) { showToast(texts().cartEmpty); return; }
+  if (!cartTotals().itemCount) {
+    showToast(texts().cartEmpty);
+    return;
+  }
   switchTab('checkout');
   if (!checkout.info) {
     const view = getElement('v-checkout');
@@ -88,11 +92,17 @@ export async function payForOrder() {
   checkout.isPaying = true;
   telegram?.MainButton?.showProgress?.();
   try {
-    const order = await callApi('/order', {
-      delivery: checkoutForm.delivery === 'pickup' ? 'pickup' : 'city',
-      city: checkoutForm.city === OTHER_CITY ? checkoutForm.other.trim() : checkoutForm.city,
-      address: checkoutForm.address, phone: checkoutForm.phone, promo: checkoutForm.promoPercent ? checkoutForm.promo : '',
-    }, 1);
+    const order = await callApi(
+      '/order',
+      {
+        delivery: checkoutForm.delivery === 'pickup' ? 'pickup' : 'city',
+        city: checkoutForm.city === OTHER_CITY ? checkoutForm.other.trim() : checkoutForm.city,
+        address: checkoutForm.address,
+        phone: checkoutForm.phone,
+        promo: checkoutForm.promoPercent ? checkoutForm.promo : '',
+      },
+      1,
+    );
     vibrate('heavy');
     state.cart = {};
     renderCart();
@@ -111,7 +121,10 @@ export async function payForOrder() {
 
 export const checkoutActions = {
   'open-checkout': () => openCheckout(),
-  'choose-delivery': (element) => { checkoutForm.delivery = element.dataset.delivery; renderCheckout(); },
+  'choose-delivery': (element) => {
+    checkoutForm.delivery = element.dataset.delivery;
+    renderCheckout();
+  },
   'apply-promo': () => applyPromo(),
   'pay-order': () => payForOrder(),
 };

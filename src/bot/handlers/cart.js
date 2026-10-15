@@ -5,7 +5,14 @@ const { translate } = require('../../i18n');
 const cart = require('../../cart');
 const orders = require('../../orders');
 const pricing = require('../../pricing');
-const { formatPrice, escapeHtml, languageOf, buildMainMenu, bothLanguages, redirectToShopIfAvailable } = require('../keyboards');
+const {
+  formatPrice,
+  escapeHtml,
+  languageOf,
+  buildMainMenu,
+  bothLanguages,
+  redirectToShopIfAvailable,
+} = require('../keyboards');
 
 const ORDER_HISTORY_LIMIT = 10;
 
@@ -31,23 +38,32 @@ async function showCart(context) {
 
 async function showMyOrders(context) {
   const language = await languageOf(context);
-  const recentOrders = await database.order.findMany({ where: { chat_id: context.chat.id }, orderBy: { created_at: 'desc' }, take: ORDER_HISTORY_LIMIT });
+  const recentOrders = await database.order.findMany({
+    where: { chat_id: context.chat.id },
+    orderBy: { created_at: 'desc' },
+    take: ORDER_HISTORY_LIMIT,
+  });
   if (!recentOrders.length) return context.reply(translate(language, 'ordersEmpty'), buildMainMenu(language));
 
   const itemsByOrderId = await orders.getItemsByOrderId(recentOrders.map((order) => order.id));
   await context.reply(translate(language, 'ordersTitle', recentOrders.length), { parse_mode: 'HTML' });
   for (const order of recentOrders) {
     const statusKey = orders.baseStatus(order.status);
-    const itemLines = itemsByOrderId.get(order.id)
+    const itemLines = itemsByOrderId
+      .get(order.id)
       .filter((orderItem) => orderItem.name !== null) // как раньше: позиции удалённых товаров не показываем
-      .map((orderItem) => `• ${escapeHtml((language === 'en' && orderItem.name_en) || orderItem.name)} ×${orderItem.quantity}`)
+      .map(
+        (orderItem) =>
+          `• ${escapeHtml((language === 'en' && orderItem.name_en) || orderItem.name)} ×${orderItem.quantity}`,
+      )
       .join('\n');
     const cityName = await pricing.translateCity(order.delivery_city, language);
 
     let orderText = `<b>${translate(language, 'orderNumber', order.order_code || order.id)}</b>\n`;
     orderText += `${translate(language, 'orderStatus')[statusKey] || statusKey}\n\n`;
     orderText += `${itemLines}\n\n`;
-    if (order.discount_percent > 0) orderText += `${translate(language, 'promoLine', escapeHtml(order.promo_code || ''), order.discount_percent)}\n`;
+    if (order.discount_percent > 0)
+      orderText += `${translate(language, 'promoLine', escapeHtml(order.promo_code || ''), order.discount_percent)}\n`;
     if (order.delivery_cost > 0) {
       orderText += `${translate(language, 'deliveryLine', escapeHtml(cityName || ''), formatPrice(order.delivery_cost))}\n`;
     } else if (order.delivery_city === null && (order.address === 'Самовывоз' || order.address === 'Pickup')) {
