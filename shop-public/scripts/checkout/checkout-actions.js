@@ -3,7 +3,7 @@
 import { state } from '../state.js';
 import { texts } from '../i18n.js';
 import { callApi } from '../api.js';
-import { telegram, vibrate, openPaymentLink } from '../telegram.js';
+import { telegram, vibrate, openPaymentLink, openExternalPage } from '../telegram.js';
 import { getElement, escapeHtml } from '../utils/dom.js';
 import { showToast } from '../utils/toast.js';
 import { cartTotals } from '../cart/cart-model.js';
@@ -81,10 +81,24 @@ function checkDeliveryAddress() {
   return true;
 }
 
-/** Кнопка «Оплатить»: проверить форму, создать заказ и открыть оплату */
+/** Без согласия на обработку персональных данных (152-ФЗ) заказ не оформляем: подсказка и подсветка галочки */
+function checkConsent() {
+  if (checkoutForm.consent) return true;
+  showToast(texts().consentRequired);
+  vibrate('light');
+  const consentBlock = document.querySelector('#v-checkout .consent');
+  consentBlock?.classList.remove('attention');
+  void consentBlock?.offsetWidth; // перезапуск анимации подсветки при повторном нажатии
+  consentBlock?.classList.add('attention');
+  consentBlock?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  return false;
+}
+
+/** Кнопка «Оплатить»: проверить форму и согласие, создать заказ и открыть оплату */
 export async function payForOrder() {
   if (checkout.isPaying) return;
   if (!checkDeliveryAddress()) return;
+  if (!checkConsent()) return;
   if (checkoutForm.promo && !checkoutForm.promoPercent) {
     await applyPromo();
     if (!checkoutForm.promoPercent) return;
@@ -100,6 +114,7 @@ export async function payForOrder() {
         address: checkoutForm.address,
         phone: checkoutForm.phone,
         promo: checkoutForm.promoPercent ? checkoutForm.promo : '',
+        consent: checkoutForm.consent,
       },
       1,
     );
@@ -107,7 +122,7 @@ export async function payForOrder() {
     state.cart = {};
     renderCart();
     renderProductGrid();
-    Object.assign(checkoutForm, { promo: '', promoPercent: 0, promoMessage: '' });
+    Object.assign(checkoutForm, { promo: '', promoPercent: 0, promoMessage: '', consent: false });
     openPaymentLink(order.pay_url);
     switchTab('orders');
     showToast(`Заказ ${order.code} создан — осталось оплатить 💳`);
@@ -127,4 +142,9 @@ export const checkoutActions = {
   },
   'apply-promo': () => applyPromo(),
   'pay-order': () => payForOrder(),
+  // ссылки на оферту, политику и согласие: в Telegram — через openLink, иначе в новой вкладке
+  'open-legal': (element, event) => {
+    event.preventDefault();
+    openExternalPage(element.href);
+  },
 };

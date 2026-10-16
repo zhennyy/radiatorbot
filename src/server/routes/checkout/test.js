@@ -8,7 +8,8 @@ let shop;
 let actions;
 
 const countCartRows = (chatId) => shop.database.cartItem.count({ where: { chat_id: chatId } });
-const placeOrder = (orderForm) => shop.call(BUYER_ID, 'POST', '/shop-api/order', orderForm);
+// согласие на обработку данных по умолчанию отмечено — его отсутствие проверяет отдельный тест
+const placeOrder = (orderForm) => shop.call(BUYER_ID, 'POST', '/shop-api/order', { consent: true, ...orderForm });
 
 before(async () => {
   shop = await testHelpers.start();
@@ -84,6 +85,80 @@ test('ошибки формы: город, адрес, телефон', async ()
   assert.match((await placeOrder({ delivery: 'pickup', phone: '123' })).body.error, /номер телефона/);
   assert.equal(await countCartRows(BUYER_ID), 1, 'корзина не тронута');
   await actions.clearCart(BUYER_ID);
+});
+
+test('152-ФЗ: без согласия на обработку данных заказ не оформляется — 400 и корзина на месте', async () => {
+  const [product] = await actions.productsInStock();
+  await actions.setCart(BUYER_ID, [[product.id, 1]]);
+  const ordersBefore = await shop.database.order.count();
+  for (const consent of [undefined, false, 'true', 1]) {
+    const response = await shop.call(BUYER_ID, 'POST', '/shop-api/order', { delivery: 'pickup', consent });
+    assert.equal(response.status, 400, `consent = ${JSON.stringify(consent)}`);
+    assert.equal(response.body.error, 'Чтобы оформить заказ, отметьте согласие на обработку персональных данных');
+  }
+  assert.equal(await shop.database.order.count(), ordersBefore, 'заказ не создан');
+  assert.equal(await countCartRows(BUYER_ID), 1, 'корзина не тронута');
+  await actions.clearCart(BUYER_ID);
+});
+
+test('152-ФЗ: с согласием у заказа записано время согласия (consent_at)', async () => {
+  const [product] = await actions.productsInStock();
+  await actions.setCart(BUYER_ID, [[product.id, 1]]);
+  const startedAt = new Date(Date.now() - 1000).toISOString().replace('T', ' ').slice(0, 19);
+  const response = await placeOrder({ delivery: 'pickup' });
+  assert.equal(response.status, 200, JSON.stringify(response.body));
+  const order = await actions.findOrder(response.body.id);
+  assert.match(order.consent_at, /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/, 'формат как у других дат в базе');
+  assert.ok(order.consent_at >= startedAt, `${order.consent_at} ≥ ${startedAt}`);
+});
+
+test('152-ФЗ: уведомление владелице о новом заказе — без телефона, адреса и имени, с городом и кнопкой админки', async () => {
+  const previousShopUrl = process.env.SHOP_URL;
+  process.env.SHOP_URL = 'https://radiator.test/shop/';
+  await shop.database.userSettings.upsert({
+    where: { chat_id: BUYER_ID },
+    create: { chat_id: BUYER_ID, name: 'Анна Иванова' },
+    update: { name: 'Анна Иванова' },
+  });
+  try {
+    const [product] = await actions.productsInStock();
+    await actions.setCart(BUYER_ID, [[product.id, 1]]);
+    const response = await placeOrder({
+      delivery: 'city',
+      city: 'Москва',
+      address: 'ул. Садовая, 15, кв. 8',
+      phone: '+7 916 555-44-33',
+    });
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    shop.sent.length = 0;
+    await actions.payLastOrder();
+    const ownerMessages = shop.sent.filter((message) => String(message.chat) === process.env.OWNER_CHAT_ID);
+    const newOrderMessage = ownerMessages.find((message) => message.text.includes('Новый заказ'));
+    assert.ok(newOrderMessage, 'владелице пришло уведомление о новом заказе');
+    assert.match(newOrderMessage.text, new RegExp(`№ ${response.body.code}`));
+    assert.match(newOrderMessage.text, /Доставка: Москва/);
+    assert.match(newOrderMessage.text, /Контакты и адрес — в админке/);
+    for (const message of ownerMessages) {
+      assert.doesNotMatch(message.text, /Садовая|кв\. 8/, 'нет адреса');
+      assert.doesNotMatch(message.text.replace(/\D/g, ''), /9165554433/, 'нет телефона');
+      assert.doesNotMatch(message.text, /Иванова|Анна/, 'нет имени, которое покупатель ввёл в боте');
+    }
+    const buttons = newOrderMessage.extra.reply_markup.inline_keyboard.flat();
+    assert.ok(
+      buttons.some((button) => button.callback_data === `reply:${BUYER_ID}`),
+      'кнопка «Написать покупателю»',
+    );
+    assert.ok(
+      buttons.some((button) => button.web_app?.url?.startsWith('https://radiator.test/shop/')),
+      'кнопка админки',
+    );
+    // покупателю в его же чат — его адрес можно
+    const buyerMessage = shop.sent.find((message) => message.chat === BUYER_ID);
+    assert.match(buyerMessage.text, /Садовая, 15/);
+  } finally {
+    if (previousShopUrl === undefined) delete process.env.SHOP_URL;
+    else process.env.SHOP_URL = previousShopUrl;
+  }
 });
 
 test('промокод даёт скидку на товары, бесплатная доставка от суммы, самовывоз можно выключить', async () => {

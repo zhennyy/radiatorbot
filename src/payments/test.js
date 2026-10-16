@@ -17,6 +17,7 @@ test('платёж создаётся на сумму заказа с кодом
     address: 'Самовывоз',
     total: 123450,
     items: [{ product_id: product.id, quantity: 1, price: 123450 }],
+    consentAt: '2026-10-16 10:00:00',
   });
   const payment = await startPayment(orderId);
   const sentPayment = testHelpers.payments.get(payment.id);

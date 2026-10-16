@@ -70,7 +70,8 @@ async function getOrder(orderId) {
   return order;
 }
 
-// Заказ со статусом pending; total уже с учётом скидки и доставки. items — [{product_id, quantity, price}]
+// Заказ со статусом pending; total уже с учётом скидки и доставки. items — [{product_id, quantity, price}].
+// consentAt — когда покупатель согласился на обработку персональных данных (152-ФЗ)
 async function createPendingOrder({
   chatId,
   address,
@@ -80,7 +81,10 @@ async function createPendingOrder({
   discountPercent = 0,
   deliveryCity = null,
   deliveryCost = 0,
+  consentAt,
 }) {
+  // заказы создаются только из того, что ввёл покупатель, — значит, без его согласия нельзя
+  if (!consentAt) throw new Error('Нет согласия покупателя на обработку персональных данных');
   return runInTransaction(async () => {
     const createdOrder = await database.order.create({
       data: {
@@ -94,6 +98,7 @@ async function createPendingOrder({
         delivery_city: deliveryCity,
         delivery_cost: deliveryCost,
         order_code: await generateOrderCode(),
+        consent_at: consentAt,
       },
     });
     await database.orderItem.createMany({
@@ -253,13 +258,9 @@ async function rateOrder(bot, chatId, orderId, stars) {
   if (order.rating) return order;
   await database.order.update({ where: { id: orderId }, data: { rating: stars } });
   if (ownerChatId()) {
-    const buyerName = (await customers.getName(chatId)) || 'Покупатель';
+    // без имени покупателя: сообщения владелице идут через Telegram (152-ФЗ)
     await bot.telegram
-      .sendMessage(
-        ownerChatId(),
-        `${'⭐'.repeat(stars)} ${escapeHtml(buyerName)} оценил(а) заказ № ${order.code} на ${stars}/5`,
-        { parse_mode: 'HTML' },
-      )
+      .sendMessage(ownerChatId(), `${'⭐'.repeat(stars)} Покупатель оценил заказ № ${order.code} на ${stars}/5`)
       .catch(() => {});
   }
   return getOrder(orderId);

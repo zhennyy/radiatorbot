@@ -1,4 +1,4 @@
-// Экран оформления: доставка или самовывоз, город и адрес, телефон, промокод, итог.
+// Экран оформления: доставка или самовывоз, город и адрес, телефон, промокод, итог, согласие на обработку данных.
 import { texts, isEnglish } from '../i18n.js';
 import { isInsideTelegram } from '../telegram.js';
 import { getElement, escapeHtml } from '../utils/dom.js';
@@ -63,6 +63,21 @@ function summaryHtml(total) {
     </div>`;
 }
 
+/** Ссылка на юридическую страницу (shop-public/legal/) — открывается действием open-legal */
+const legalLink = (fileName) => (linkText) =>
+  `<a href="legal/${fileName}" target="_blank" rel="noopener" data-action="open-legal">${linkText}</a>`;
+
+/** Галочка согласия на обработку персональных данных (152-ФЗ) и строка про оферту — прямо перед оплатой */
+function consentHtml() {
+  return `<div class="consent">
+      <label class="consent-check">
+        <input id="coConsent" type="checkbox" ${checkoutForm.consent ? 'checked' : ''}>
+        <span>${texts().consentLabel(legalLink('consent.html'))}</span>
+      </label>
+      <div class="consent-note">${texts().consentNote(legalLink('offer.html'), legalLink('privacy.html'))}</div>
+    </div>`;
+}
+
 export function renderCheckout() {
   const total = cartTotals().sum - discountAmount() + deliveryCost();
   getElement('v-checkout').innerHTML = `<h1>Оформление</h1>
@@ -77,7 +92,8 @@ export function renderCheckout() {
       ${checkoutForm.promoMessage ? `<div class="fld ok">✓ ${escapeHtml(checkoutForm.promoMessage)}</div>` : ''}
     </div>
     ${summaryHtml(total)}
-    ${isInsideTelegram ? '' : `<button class="btn" data-action="pay-order">Оплатить · ${formatRubles(total)}</button>`}
+    ${consentHtml()}
+    ${isInsideTelegram ? '' : `<button class="btn" data-action="pay-order" aria-disabled="${!checkoutForm.consent}">Оплатить · ${formatRubles(total)}</button>`}
     <div class="note">${texts().checkoutNote}</div>`;
   listenToCheckoutFields();
   updateMainButton();
@@ -102,4 +118,11 @@ function listenToCheckoutFields() {
   bindField('coPromo', 'promo');
   // цена зависит от города — пересчитываем, когда покупатель закончил ввод
   getElement('coOther')?.addEventListener('change', () => renderCheckout());
+  getElement('coConsent')?.addEventListener('change', (event) => {
+    checkoutForm.consent = event.target.checked;
+    document
+      .querySelector('#v-checkout [data-action="pay-order"]')
+      ?.setAttribute('aria-disabled', String(!checkoutForm.consent));
+    updateMainButton();
+  });
 }

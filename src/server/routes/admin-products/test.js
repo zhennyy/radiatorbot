@@ -142,7 +142,18 @@ test('фото: с телефона (raw) и по ссылке — только 
   assert.deepEqual(byLink.body, { ok: true, local: false }); // без PUBLIC_URL фото не скачивается к себе
 });
 
-test('резервная копия уходит владелице ZIP-файлом', async () => {
+test('резервная копия уходит владелице ZIP-файлом — без адресов и телефонов покупателей', async () => {
+  await shop.database.order.create({
+    data: {
+      chat_id: BUYER_ID,
+      status: 'paid',
+      total: 100000,
+      address: 'Москва, ул. Архивная, 3 · тел. +7 999 000-11-22',
+      delivery_city: 'Москва',
+      order_code: 'BK01',
+      consent_at: '2026-10-16 10:00:00',
+    },
+  });
   let sentDocument = null;
   shop.bot.telegram.sendDocument = async (chatId, document) => {
     sentDocument = { chatId, document };
@@ -154,6 +165,10 @@ test('резервная копия уходит владелице ZIP-файл
   assert.match(sentDocument.document.filename, /^radiatorpro-backup-\d{4}-\d\d-\d\d_\d\d-\d\d\.zip$/);
   assert.equal(sentDocument.document.source.readUInt32LE(0), 0x04034b50, 'это ZIP');
   assert.ok(sentDocument.document.source.includes(Buffer.from('Резервная копия RadiatorPro')));
+  // архив уходит через Telegram — персональных данных в нём быть не должно (152-ФЗ)
+  assert.ok(sentDocument.document.source.includes(Buffer.from('BK01')), 'заказ в архиве есть');
+  assert.ok(!sentDocument.document.source.includes(Buffer.from('Архивная')), 'нет адреса');
+  assert.ok(!sentDocument.document.source.includes(Buffer.from('000-11-22')), 'нет телефона');
 });
 
 test('покупателю админка товаров недоступна, без подписи — 401', async () => {

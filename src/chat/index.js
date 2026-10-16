@@ -34,6 +34,9 @@ function escapeToFit(text, maxLength) {
   return escapeHtml(fittingText);
 }
 
+// Имя покупателя в сообщениях владелице — только имя из профиля Telegram (данные самого Telegram), не то, что он ввёл у нас (152-ФЗ)
+const telegramFirstName = (context) => context.from.first_name || 'Покупатель';
+
 const replyTargets = new Map(); // id владелицы → { chatId, until }
 const acknowledgedAt = new Map(); // id покупателя → когда сказали «передали менеджеру»
 
@@ -157,9 +160,7 @@ function setupActions(bot) {
     const buyerChatId = Number(context.match[1]);
     replyTargets.set(String(context.from.id), { chatId: buyerChatId, until: Date.now() + REPLY_WINDOW_MS });
     await context.answerCbQuery();
-    await context.reply(
-      `✍️ Напишите ответ для ${(await customers.getName(buyerChatId)) || 'покупателя'} — следующее сообщение уйдёт ему.\nПередумали — /cancel`,
-    );
+    await context.reply('✍️ Напишите ответ покупателю — следующее сообщение уйдёт ему.\nПередумали — /cancel');
   });
 
   // ── Оценка после доставки ──
@@ -195,7 +196,7 @@ async function forwardOwnerMedia(bot, context, mediaKind) {
     await bot.telegram.copyMessage(targetChatId, context.chat.id, context.message.message_id);
     await messages.saveMessage({ chatId: targetChatId, fromOwner: true, text: `[${MEDIA_LABELS[mediaKind]}]` });
     replyTargets.delete(String(context.from.id));
-    await context.reply(`✓ Отправлено: ${(await customers.getName(targetChatId)) || 'покупателю'}`);
+    await context.reply('✓ Отправлено покупателю');
   } catch (copyError) {
     await context.reply('Telegram не доставил: ' + copyError.message);
   }
@@ -212,7 +213,7 @@ async function relayBuyerMedia(bot, context, mediaKind) {
     text: `[${MEDIA_LABELS[mediaKind]}]${caption ? ' ' + truncate(caption, 3500) : ''}`,
   });
   if (ownerChatId) {
-    const buyerName = (await customers.getName(buyerChatId)) || context.from.first_name || 'Покупатель';
+    const buyerName = telegramFirstName(context);
     await bot.telegram
       .sendMessage(
         ownerChatId,
@@ -246,7 +247,7 @@ async function handleOwnerText(bot, context, { text, photo }) {
   try {
     await sendToBuyer(bot, targetChatId, { text, photo });
     replyTargets.delete(String(context.from.id));
-    return context.reply(`✓ Отправлено: ${(await customers.getName(targetChatId)) || 'покупателю'}`);
+    return context.reply('✓ Отправлено покупателю');
   } catch (sendError) {
     return context.reply('Telegram не доставил сообщение: ' + sendError.message);
   }
@@ -262,7 +263,7 @@ async function relayBuyerText(bot, context, { text, photo }) {
   });
   const ownerChatId = process.env.OWNER_CHAT_ID;
   if (ownerChatId) {
-    const buyerName = (await customers.getName(buyerChatId)) || context.from.first_name || 'Покупатель';
+    const buyerName = telegramFirstName(context);
     const lastOrder = await database.order.findFirst({
       where: { chat_id: buyerChatId },
       orderBy: { id: 'desc' },

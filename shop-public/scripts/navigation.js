@@ -7,11 +7,13 @@ import { cartTotals } from './cart/cart-model.js';
 import { renderCart } from './cart/cart-view.js';
 import { closeSheet, isSheetOpen } from './catalog/product-sheet.js';
 import { loadOrders } from './orders/orders-view.js';
-import { amountToPay } from './checkout/checkout-state.js';
+import { amountToPay, checkoutForm } from './checkout/checkout-state.js';
 import { openCheckout, payForOrder } from './checkout/checkout-actions.js';
 import { loadAdmin, goBackInAdmin } from './admin/admin-page.js';
 
 const MAIN_BUTTON_COLORS = { color: '#e8590c', text_color: '#ffffff' };
+// «Оплатить» без отмеченного согласия на обработку данных: кнопка серая, нажатие подсказывает отметить галочку
+const MAIN_BUTTON_WAITING_COLORS = { color: '#adb5bd', text_color: '#ffffff' };
 
 export function switchTab(tabName) {
   state.activeTab = tabName;
@@ -44,7 +46,8 @@ export function updateMainButton() {
   if (state.activeTab === 'checkout') text = `Оплатить · ${formatRubles(amountToPay())}`;
   else if (state.activeTab === 'cart') text = texts().checkout(formatRubles(sum));
   else text = `🛒 ${texts().tabCart} · ${formatRubles(sum)}`;
-  telegram.MainButton.setParams({ text, ...MAIN_BUTTON_COLORS });
+  const isWaitingForConsent = state.activeTab === 'checkout' && !checkoutForm.consent;
+  telegram.MainButton.setParams({ text, ...(isWaitingForConsent ? MAIN_BUTTON_WAITING_COLORS : MAIN_BUTTON_COLORS) });
   telegram.MainButton.show();
 }
 

@@ -108,20 +108,21 @@ function phoneOf(order) {
   return phoneMatch ? phoneMatch[1].trim() : '';
 }
 
+// Карточка заказа для владелицы в Telegram. Telegram — зарубежный сервис, поэтому здесь нет персональных данных
+// покупателя (152-ФЗ): ни телефона, ни адреса, ни имени — только город. Контакты и адрес — в админке на нашем сервере.
+// Ссылка tg://user — это данные самого Telegram, по ней владелица может написать покупателю.
 async function ownerText(order) {
-  const buyerName = (await customers.getName(order.chat_id)) || 'Покупатель';
-  const buyerPhone = phoneOf(order);
   const lines = [
     `${order.base === 'paid' ? '🆕 <b>Новый заказ</b>' : '<b>Заказ</b>'} № ${order.code} · ${formatRubles(order.total)}`,
-    `👤 <a href="tg://user?id=${order.chat_id}">${escapeHtml(buyerName)}</a>${buyerPhone ? ' · ' + escapeHtml(buyerPhone) : ''}`,
+    `👤 <a href="tg://user?id=${order.chat_id}">Покупатель в Telegram</a>`,
     '',
     itemsText(order, 'ru'),
     '',
-    isPickup(order) ? '🏠 Самовывоз' : `📍 ${escapeHtml(String(order.address || '').replace(/ · тел\..*$/, ''))}`,
+    isPickup(order) ? '🏠 Самовывоз' : `🚚 Доставка: ${escapeHtml(order.delivery_city)}`,
   ];
   if (order.track) lines.push(`🚚 Трек: <code>${escapeHtml(order.track)}</code>`);
   if (order.rating) lines.push(`⭐ Оценка: ${order.rating}/5`);
-  lines.push('', `Статус: <b>${statusLabel(order, 'ru')}</b>`);
+  lines.push('', `Статус: <b>${statusLabel(order, 'ru')}</b>`, '📇 Контакты и адрес — в админке');
   return lines.join('\n');
 }
 

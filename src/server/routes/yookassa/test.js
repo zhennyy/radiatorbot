@@ -60,7 +60,11 @@ test('оплаченный заказ отменили — товар верну
   const [product] = await actions.productsInStock();
   const stockBefore = (await actions.findProduct(product.id)).stock;
   await actions.setCart(BUYER_ID, [[product.id, 3]]);
-  const response = await shop.call(BUYER_ID, 'POST', '/shop-api/order', { delivery: 'pickup', promo: 'zima' });
+  const response = await shop.call(BUYER_ID, 'POST', '/shop-api/order', {
+    delivery: 'pickup',
+    promo: 'zima',
+    consent: true,
+  });
   assert.equal(response.status, 200, JSON.stringify(response.body));
   const payment = await actions.payLastOrder();
   await actions.sendPaymentWebhook(payment.id);

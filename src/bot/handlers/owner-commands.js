@@ -33,7 +33,9 @@ function formatOwnerOrder(order) {
     orderText += '🚚 Самовывоз\n';
   }
   orderText += `💰 Сумма: <b>${formatPrice(order.total)}</b>\n`;
-  orderText += `📍 ${escapeHtml(order.address || '—')}\n`;
+  // адрес и телефон в Telegram не показываем (152-ФЗ) — только город
+  orderText += order.delivery_city ? `📍 ${escapeHtml(order.delivery_city)}\n` : '';
+  orderText += 'Контакты и адрес — в админке\n';
   orderText += `🕐 ${(order.created_at || '').slice(0, 16).replace('T', ' ')}`;
   return orderText;
 }

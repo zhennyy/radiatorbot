@@ -1,4 +1,4 @@
-// Проверка запросов оформления: способ доставки, адрес, промокод, телефон
+// Проверка запросов оформления: способ доставки, адрес, промокод, телефон, согласие на обработку данных
 const { ValidationError, createValidator, cleanText } = require('../../validation');
 
 const MIN_PHONE_DIGITS = 10;
@@ -12,9 +12,12 @@ const readDeliveryForm = (requestBody) => ({
 
 const promoPostValidator = createValidator((request) => ({ promoCode: request.body.code }));
 
-// Заказ: телефон необязателен, но если указан — не меньше 10 цифр
+// Заказ: без согласия на обработку персональных данных (152-ФЗ) не оформляем;
+// телефон необязателен, но если указан — не меньше 10 цифр
 const orderPostValidator = createValidator((request) => {
   const requestBody = request.body || {};
+  if (requestBody.consent !== true)
+    throw new ValidationError('Чтобы оформить заказ, отметьте согласие на обработку персональных данных');
   const phone = cleanText(requestBody.phone, 30);
   if (phone && phone.replace(/\D/g, '').length < MIN_PHONE_DIGITS)
     throw new ValidationError('Проверьте номер телефона');

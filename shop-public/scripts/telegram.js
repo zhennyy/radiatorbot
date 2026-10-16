@@ -36,3 +36,9 @@ export function openPaymentLink(url) {
   if (telegram?.openLink) telegram.openLink(url);
   else window.open(url, '_blank');
 }
+
+/** Страница сайта (оферта, политика) — во внешнем браузере Telegram или в новой вкладке */
+export function openExternalPage(url) {
+  if (telegram?.openLink) telegram.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+}

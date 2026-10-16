@@ -63,3 +63,20 @@ test('ошибка внутри маршрута — короткий JSON бе�
   assert.deepEqual(Object.keys(body), ['error']);
   assert.doesNotMatch(body.error, /at .*\.js/);
 });
+
+test('152-ФЗ: юридические страницы отдаются вместе с витриной без подписи Telegram', async () => {
+  const expectedTitles = {
+    privacy: 'Политика обработки персональных данных',
+    consent: 'Согласие на обработку персональных данных',
+    offer: 'Публичная оферта',
+  };
+  for (const [pageName, title] of Object.entries(expectedTitles)) {
+    const response = await fetch(`${shop.base}/shop/legal/${pageName}.html`);
+    assert.equal(response.status, 200, pageName);
+    assert.match(response.headers.get('content-type'), /text\/html/);
+    const html = await response.text();
+    assert.match(html, new RegExp(`<h1>${title}</h1>`), pageName);
+    assert.match(html, /Шаблон: заполните реквизиты перед запуском/, pageName);
+  }
+  assert.equal((await fetch(`${shop.base}/shop/legal/legal.css`)).status, 200);
+});

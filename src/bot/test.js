@@ -96,11 +96,21 @@ test('каталог, корзина и оформление заказа в ч�
   await sendText(BUYER_ID, 'ул. Ленина, 1');
   assert.match(lastSentText(), /промокод/i);
   await sendText(BUYER_ID, '-');
-  assert.match(lastSentText(), /Итого/);
+  assert.match(sentTexts().at(-2), /Итого/);
+  // 152-ФЗ: перед оплатой — кнопка согласия на обработку данных, без неё заказ не создаётся
+  assert.match(lastSentText(), /согласие на обработку персональных данных/);
+  assert.equal(findCallbackButton(/Согласен на обработку данных/), 'checkout_consent');
   const ordersBefore = await shop.database.order.count();
+  await pressButton(BUYER_ID, 'pay_yookassa');
+  assert.equal(await shop.database.order.count(), ordersBefore, 'без согласия заказ не создан');
+  assert.match(lastSentText(), /без согласия оформить заказ нельзя/);
+  await pressButton(BUYER_ID, 'checkout_consent');
+  assert.match(lastSentText(), /Согласие получено/);
+  assert.equal(findCallbackButton(/Оплатить/), 'pay_yookassa');
   await pressButton(BUYER_ID, 'pay_yookassa');
   assert.equal(await shop.database.order.count(), ordersBefore + 1);
   const createdOrder = await shop.database.order.findFirst({ where: { chat_id: BUYER_ID }, orderBy: { id: 'desc' } });
+  assert.match(createdOrder.consent_at, /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
   assert.match(createdOrder.status, /^awaiting_payment:/);
   assert.equal(createdOrder.delivery_city, 'Москва');
   assert.equal(await shop.database.cartItem.count({ where: { chat_id: BUYER_ID } }), 0, 'корзина очищена');
@@ -118,6 +128,7 @@ test('сбой ЮKassa при оплате в чате: заказ отменё�
   await pressButton(BUYER_ID, 'checkout_start');
   await pressButton(BUYER_ID, 'deliv_pickup');
   await sendText(BUYER_ID, '-');
+  await pressButton(BUYER_ID, 'checkout_consent');
   const originalPost = axios.post;
   axios.post = async () => {
     throw new Error('ЮKassa недоступна');
@@ -160,8 +171,11 @@ test('команды владелицы: промокод, остаток, до�
 
   await sendText(OWNER_ID, '/deliveries');
   assert.match(lastSentText(), /Казань — 900 ₽ \(выключен\)/);
+  telegramCalls = [];
   await sendText(OWNER_ID, '/orders');
   assert.match(sentTexts().join('\n'), /Заказ #\d+/);
+  assert.match(sentTexts().join('\n'), /📍 Москва\n/);
+  assert.doesNotMatch(sentTexts().join('\n'), /Ленина/, 'адреса покупателей в Telegram не показываем');
 
   const callsBefore = telegramCalls.length;
   await sendText(BUYER_ID, '/addpromo HACK 50');
@@ -177,6 +191,15 @@ test('переписка: сообщение покупателя уходит �
   );
   assert.ok(toOwner, 'владелица получила сообщение');
   assert.match(toOwner.payload.text, /трубчатые/);
+  // имя — только из профиля Telegram (first_name «Анна» в подставном апдейте), а не введённое в боте
+  await shop.database.userSettings.update({ where: { chat_id: BUYER_ID }, data: { name: 'Анна Петровна Сидорова' } });
+  telegramCalls = [];
+  await sendText(BUYER_ID, 'И ещё вопрос');
+  const secondToOwner = telegramCalls.find(
+    (call) => call.method === 'sendMessage' && String(call.payload.chat_id) === String(OWNER_ID),
+  );
+  assert.match(secondToOwner.payload.text, />Анна</);
+  assert.doesNotMatch(secondToOwner.payload.text, /Сидорова/);
   const savedMessage = await shop.database.message.findFirst({ where: { chat_id: BUYER_ID }, orderBy: { id: 'desc' } });
   assert.equal(savedMessage.from_owner, 0);
 
@@ -201,8 +224,16 @@ test('статус заказа кнопкой владелицы и оценк�
     where: { id: order.id },
     data: { status: 'paid', paid_at: '2026-01-01 00:00:00' },
   });
+  telegramCalls = [];
   await pressButton(OWNER_ID, `ost:${order.id}:delivered`);
   assert.equal((await shop.database.order.findUnique({ where: { id: order.id } })).status, 'delivered');
+  const refreshedCard = telegramCalls.find((call) => call.method === 'editMessageText');
+  assert.match(refreshedCard.payload.text, /Контакты и адрес — в админке/);
+  assert.doesNotMatch(refreshedCard.payload.text, /Ленина|Сидорова/);
   await pressButton(BUYER_ID, `rate:${order.id}:5`);
   assert.equal((await shop.database.order.findUnique({ where: { id: order.id } })).rating, 5);
+  const ratingNote = telegramCalls.find(
+    (call) => call.method === 'sendMessage' && String(call.payload.chat_id) === String(OWNER_ID),
+  );
+  assert.equal(ratingNote.payload.text, `⭐⭐⭐⭐⭐ Покупатель оценил заказ № ${order.order_code} на 5/5`);
 });

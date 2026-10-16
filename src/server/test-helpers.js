@@ -108,7 +108,7 @@ function createShopActions(shop) {
   const buy = async (chatId, productQuantities) => {
     await clearCart(chatId);
     await setCart(chatId, productQuantities);
-    return shop.call(chatId, 'POST', '/shop-api/order', { delivery: 'pickup', phone: '89001234567' });
+    return shop.call(chatId, 'POST', '/shop-api/order', { delivery: 'pickup', phone: '89001234567', consent: true });
   };
   const sendPaymentWebhook = (paymentId) =>
     fetch(shop.base + '/yookassa-webhook', {

@@ -117,7 +117,7 @@ function createAdminProductsRouter({ bot, ownerAuth, forgetShowcasePhoto }) {
           request.chatId,
           { source: backup.buffer, filename: backup.filename },
           {
-            caption: `📦 Резервная копия магазина\nФото: ${backup.photos} · заказы и каталог — в Excel-файлах внутри.\nХраните у себя: там адреса покупателей.`,
+            caption: `📦 Резервная копия магазина\nФото: ${backup.photos} · заказы и каталог — в Excel-файлах внутри.\nАдресов и телефонов покупателей в архиве нет — они в админке.`,
           },
         );
         response.json({ ok: true, size: backup.buffer.length });

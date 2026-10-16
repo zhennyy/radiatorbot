@@ -1,4 +1,5 @@
-// Экраны покупателя: каталог, карточки, корзина, оформление (доставка, другой город, самовывоз, промокод), заказы, AI, язык, тёмная тема.
+// Экраны покупателя: каталог, карточки, корзина, оформление (доставка, другой город, самовывоз, промокод,
+// согласие на обработку данных), заказы, AI, язык, тёмная тема.
 const { normalizeOrders, BUYER_ID } = require('./test-data');
 const { pressMainButton, closeSheetByVeil, tabButton } = require('./browser');
 
@@ -48,9 +49,30 @@ async function runBuyerScreens(runner, shop) {
   await page.locator('#v-checkout .btn', { hasText: 'Применить' }).click();
   await snap(page, 'b15-checkout-promo');
 
-  // сценарий: самовывоз → оплата → заказ виден в «Мои заказы»
+  // сценарий: самовывоз → без согласия оплатить нельзя → галочка согласия → оплата → заказ виден в «Мои заказы»
   await page.locator('#v-checkout .seg button', { hasText: 'Самовывоз' }).click();
   await page.fill('#coPhone', '+7 900 123-45-67');
+  check('галочка согласия на обработку данных по умолчанию снята', !(await page.isChecked('#coConsent')));
+  const ordersBeforeConsent = await shop.database.order.count();
+  await pressMainButton(page);
+  await snap(page, 'b15a-checkout-consent-required', { keepToast: true });
+  check(
+    'без согласия «Оплатить» не создаёт заказ и просит отметить галочку',
+    (await shop.database.order.count()) === ordersBeforeConsent &&
+      (await page.evaluate(() => window.__telegramLog.links.length)) === 0 &&
+      /Отметьте согласие на обработку данных/.test(await page.locator('#toast').innerText()),
+    await page.locator('#toast').innerText(),
+  );
+  check(
+    'без согласия MainButton серая, с согласием — оранжевая',
+    (await page.evaluate(() => window.Telegram.WebApp.MainButton.params.color)) === '#adb5bd',
+  );
+  await page.check('#coConsent');
+  check(
+    'с согласием MainButton снова оранжевая',
+    (await page.evaluate(() => window.Telegram.WebApp.MainButton.params.color)) === '#e8590c',
+  );
+  await snap(page, 'b15b-checkout-consent-given');
   await pressMainButton(page);
   await page.waitForSelector('#v-orders.on .order');
   await runner.settle(page);
@@ -78,6 +100,7 @@ async function runBuyerScreens(runner, shop) {
     newOrder.promo_code === 'HEAT10' && !newOrder.delivery_city,
     JSON.stringify({ promo: newOrder.promo_code, city: newOrder.delivery_city }),
   );
+  check('у заказа записано время согласия', /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(newOrder.consent_at || ''));
 
   await tabButton(page, 'Корзина').click();
   await snap(page, 'b17-cart-empty');
@@ -100,7 +123,25 @@ async function runBuyerScreens(runner, shop) {
   await snap(dark, 'b22-catalog-dark');
   await dark.locator('#grid .card', { hasText: 'Milano' }).click();
   await snap(dark, 'b23-sheet-dark');
+  // оформление в тёмной теме: галочка согласия и ссылки на юридические страницы
+  await dark.locator('#sheet .act .add').click();
+  await closeSheetByVeil(dark);
+  await tabButton(dark, 'Корзина').click();
+  await pressMainButton(dark);
+  await dark.waitForSelector('#coConsent');
+  await dark.check('#coConsent');
+  await snap(dark, 'b25-checkout-dark');
+  await dark.locator('#v-checkout .consent a', { hasText: 'согласие на обработку' }).click();
+  const legalLinks = await dark.evaluate(() => window.__telegramLog.links);
+  check(
+    'ссылка на согласие открывается через Telegram.WebApp.openLink',
+    legalLinks.length === 1 && legalLinks[0].endsWith('/shop/legal/consent.html'),
+    JSON.stringify(legalLinks),
+  );
+  const legalPageStatus = (await fetch(legalLinks[0])).status;
+  check('страница согласия отдаётся (200)', legalPageStatus === 200, String(legalPageStatus));
   await dark.context().close();
+  await shop.database.cartItem.deleteMany({ where: { chat_id: BUYER_ID } });
 
   const outside = await openPage(null, { name: 'outside-telegram', waitFor: '#grid .empty' });
   await snap(outside, 'b24-outside-telegram');

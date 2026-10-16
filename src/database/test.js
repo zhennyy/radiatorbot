@@ -49,7 +49,7 @@ const columnsOf = (connection, tableName) =>
     .all()
     .map((column) => column.name);
 
-test('старая база: миграции дают позициям заказа id = прежний rowid, данные на месте, второй запуск ничего не меняет', () => {
+test('старая база: миграции дают позициям заказа id = прежний rowid, добавляют consent_at, данные на месте, второй запуск ничего не меняет', () => {
   const oldDatabasePath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'radiatorbot-old-')), 'shop.db');
   const oldConnection = new Database(oldDatabasePath);
   oldConnection.exec(OLD_SCHEMA_SQL);
@@ -77,7 +77,7 @@ test('старая база: миграции дают позициям зака
       .prepare('SELECT name FROM _app_migrations ORDER BY name')
       .all()
       .map((row) => row.name),
-    ['001_baseline.sql', '002_order_items_id.sql'],
+    ['001_baseline.sql', '002_order_items_id.sql', '003_order_consent.sql'],
   );
   assert.deepEqual(migrated.prepare('SELECT id AS rowid, product_id FROM order_items ORDER BY id').all(), rowidsBefore);
   assert.deepEqual(columnsOf(migrated, 'order_items'), [
@@ -89,6 +89,14 @@ test('старая база: миграции дают позициям зака
     'stock_taken',
   ]);
   assert.equal(migrated.prepare('SELECT order_code FROM orders WHERE id = 1').get().order_code, 'AB12');
+  // 003: колонка согласия (152-ФЗ) добавлена в конец, у старого заказа она пустая, остальные поля на месте
+  assert.equal(columnsOf(migrated, 'orders').at(-1), 'consent_at');
+  assert.deepEqual(migrated.prepare('SELECT status, total, paid_at, consent_at FROM orders WHERE id = 1').get(), {
+    status: 'paid',
+    total: 3000,
+    paid_at: '2026-10-01 10:00:00',
+    consent_at: null,
+  });
   migrated.close();
 });
 

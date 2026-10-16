@@ -55,6 +55,7 @@ model Order {
   status_msg_id    Int?
   payment_id       String?
   paid_at          String?
+  consent_at       String? // согласие на обработку персональных данных (152-ФЗ); null — у заказов до его введения
 
   @@map("orders")
 }

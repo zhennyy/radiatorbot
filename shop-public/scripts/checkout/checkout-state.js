@@ -11,6 +11,7 @@ export const checkoutForm = {
   promo: '',
   promoPercent: 0,
   promoMessage: '',
+  consent: false, // согласие на обработку персональных данных (152-ФЗ) — каждый раз отмечается заново, по умолчанию снято
 };
 
 export const OTHER_CITY = '__other';

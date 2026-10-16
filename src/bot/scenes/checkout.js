@@ -1,6 +1,6 @@
-// Оформление заказа в чате: город → адрес → промокод → итог → оплата
+// Оформление заказа в чате: город → адрес → промокод → итог → согласие на обработку данных → оплата
 const { Scenes, Markup } = require('telegraf');
-const { database } = require('../../database');
+const { database, toSqliteTimestamp } = require('../../database');
 const { getCart, clearCart } = require('../../cart');
 const { translate } = require('../../i18n');
 const pricing = require('../../pricing');
@@ -8,6 +8,7 @@ const customers = require('../../customers');
 const orders = require('../../orders');
 const { getDeliverySettings } = require('../../settings');
 const { startPayment } = require('../../payments/start');
+const { legalPageUrl } = require('../../legal');
 
 const SUMMARY_STEP_INDEX = 3;
 const formatRublesShort = (kopecks) => (kopecks / 100).toFixed(0) + ' ₽';
@@ -135,15 +136,29 @@ async function showPromoOrSummary(context) {
   );
   summary += translate(language, 'totalSummary', formatRublesShort(priceQuote.total));
 
-  await context.reply(
-    summary,
-    Markup.inlineKeyboard([
-      Markup.button.callback(translate(language, 'payButton'), 'pay_yookassa'),
-      Markup.button.callback(translate(language, 'cancelButton'), 'checkout_cancel'),
-    ]),
-  );
+  await context.reply(summary);
+  await askForConsent(context, language);
   return context.wizard.next();
 }
+
+// 152-ФЗ: перед оплатой — согласие на обработку персональных данных (кнопка + ссылка на текст согласия)
+async function askForConsent(context, language) {
+  const consentUrl = legalPageUrl('consent');
+  const links = { consent: consentUrl, offer: legalPageUrl('offer'), privacy: legalPageUrl('privacy') };
+  const keyboardRows = [[Markup.button.callback(translate(language, 'consentButton'), 'checkout_consent')]];
+  if (consentUrl) keyboardRows.push([Markup.button.url(translate(language, 'consentDocumentButton'), consentUrl)]);
+  keyboardRows.push([Markup.button.callback(translate(language, 'cancelButton'), 'checkout_cancel')]);
+  await context.reply(translate(language, 'consentPrompt', links), {
+    ...Markup.inlineKeyboard(keyboardRows),
+    link_preview_options: { is_disabled: true },
+  });
+}
+
+const payKeyboard = (language) =>
+  Markup.inlineKeyboard([
+    Markup.button.callback(translate(language, 'payButton'), 'pay_yookassa'),
+    Markup.button.callback(translate(language, 'cancelButton'), 'checkout_cancel'),
+  ]);
 
 const checkoutScene = new Scenes.WizardScene(
   'checkout-wizard',
@@ -200,12 +215,21 @@ checkoutScene.action('checkout_cancel', async (context) => {
   return context.scene.leave();
 });
 
+// «✅ Согласен на обработку данных» — запоминаем время согласия и показываем кнопку оплаты
+checkoutScene.action('checkout_consent', async (context) => {
+  const language = await languageOf(context);
+  await context.answerCbQuery();
+  context.wizard.state.consentAt = toSqliteTimestamp();
+  await context.reply(translate(language, 'consentAccepted'), payKeyboard(language));
+});
+
 checkoutScene.action('pay_yookassa', async (context) => {
   const language = await languageOf(context);
   const chatId = context.chat.id;
   await context.answerCbQuery();
 
   const wizardState = context.wizard.state;
+  if (!wizardState.consentAt) return context.reply(translate(language, 'consentRequired'));
   const deliveryCity = wizardState.deliveryCity || null;
   // Пока покупатель шёл по шагам, корзину могли изменить (например, в витрине).
   // Пересчитываем сумму по текущей корзине и сверяем — иначе можно было бы оплатить старую, меньшую сумму.
@@ -237,6 +261,7 @@ checkoutScene.action('pay_yookassa', async (context) => {
     discountPercent: wizardState.discountPercent || 0,
     deliveryCity,
     deliveryCost: priceQuote.delivery,
+    consentAt: wizardState.consentAt,
   });
   // промокод засчитываем, когда придёт оплата (orders.markPaid)
   await context.scene.leave();

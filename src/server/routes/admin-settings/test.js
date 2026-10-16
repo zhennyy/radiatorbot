@@ -85,6 +85,7 @@ test('статистика: выручка по оплаченным заказ�
     delivery: 'city',
     city: 'Псков',
     address: 'ул. Советская, 5',
+    consent: true,
   });
   assert.equal(response.status, 200, JSON.stringify(response.body));
   await actions.payLastOrder();

@@ -1,4 +1,4 @@
-// Тексты интерфейса на русском и английском. Оформление и админка — только на русском, как и раньше.
+// Тексты интерфейса на русском и английском. Оформление (кроме согласия на обработку данных) и админка — только на русском, как и раньше.
 import { state } from './state.js';
 
 const TEXTS = {
@@ -25,6 +25,11 @@ const TEXTS = {
     cartEmpty: 'Корзина пока пуста',
     toCatalog: 'Перейти в каталог',
     checkoutNote: 'Оплата картой или СБП через ЮKassa — безопасно.',
+    // согласие на обработку персональных данных (152-ФЗ); ссылки — готовые <a> из checkout-view.js
+    consentLabel: (consentLink) => `Я даю ${consentLink('согласие на обработку персональных данных')}`,
+    consentNote: (offerLink, privacyLink) =>
+      `Оформляя заказ, вы принимаете ${offerLink('условия оферты')} и ${privacyLink('политику обработки персональных данных')}`,
+    consentRequired: 'Отметьте согласие на обработку данных',
     ordersTitle: 'Мои заказы',
     ordersEmpty: 'Заказов пока нет',
     delivery: 'Доставка',
@@ -58,6 +63,10 @@ const TEXTS = {
     cartEmpty: 'Your cart is empty',
     toCatalog: 'Go to catalog',
     checkoutNote: 'Pay by card or SBP via ЮKassa — secure.',
+    consentLabel: (consentLink) => `I ${consentLink('consent to the processing of my personal data')}`,
+    consentNote: (offerLink, privacyLink) =>
+      `By placing the order you accept the ${offerLink('public offer')} and the ${privacyLink('personal data policy')}`,
+    consentRequired: 'Please tick the consent to data processing',
     ordersTitle: 'My orders',
     ordersEmpty: 'No orders yet',
     delivery: 'Delivery',

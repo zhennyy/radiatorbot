@@ -86,7 +86,12 @@ function findPhotoFile(photoUrl, directories) {
 
 async function makeBackup({ uploadsDir, photosDir }) {
   const products = await database.product.findMany({ orderBy: { id: 'asc' } });
-  const allOrders = await database.order.findMany({ orderBy: { id: 'asc' } });
+  // Архив уходит владелице через Telegram (зарубежный сервис), поэтому без персональных данных покупателей (152-ФЗ):
+  // адрес и телефон не кладём, только город. Они остаются в админке и в ночной копии базы на нашем сервере.
+  const allOrders = (await database.order.findMany({ orderBy: { id: 'asc' } })).map(({ address, ...order }) => ({
+    ...order,
+    address: address == null ? null : order.delivery_city || 'Самовывоз',
+  }));
   const orderItems = await database.orderItem.findMany({ orderBy: [{ order_id: 'asc' }, { id: 'asc' }] });
   const promoCodes = await database.promoCode.findMany();
   const deliveryRates = await database.deliveryRate.findMany();
@@ -119,7 +124,7 @@ async function makeBackup({ uploadsDir, photosDir }) {
     status: String(order.status || '').split(':')[0],
     total_rub: order.total / 100,
     delivery_rub: (order.delivery_cost || 0) / 100,
-    address: order.address,
+    city: order.delivery_city || 'Самовывоз',
     promo: order.promo_code,
     track: order.track,
     rating: order.rating,
@@ -135,7 +140,7 @@ async function makeBackup({ uploadsDir, photosDir }) {
     { name: 'messages.json', data: JSON.stringify(messages, null, 2) },
     {
       name: 'README.txt',
-      data: `Резервная копия RadiatorPro от ${timestamp.replace('_', ' ')} (МСК).\n\ncatalog.csv и orders.csv открываются в Excel/Numbers.\nphotos/ — фото товаров (номер в начале — id товара).\n\nВ архиве есть адреса покупателей — храните его у себя и не выкладывайте на GitHub.\n`,
+      data: `Резервная копия RadiatorPro от ${timestamp.replace('_', ' ')} (МСК).\n\ncatalog.csv и orders.csv открываются в Excel/Numbers.\nphotos/ — фото товаров (номер в начале — id товара).\n\nАдресов и телефонов покупателей в архиве нет (152-ФЗ) — они в админке магазина.\nПереписка с покупателями (messages.json) — храните архив у себя и не выкладывайте на GitHub.\n`,
     },
   );
   return {
